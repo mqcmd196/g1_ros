@@ -1,0 +1,27 @@
+initial_positions:
+  left_shoulder_pitch_joint: 0
+  left_shoulder_roll_joint: 0
+  left_shoulder_yaw_joint: 0
+  left_elbow_joint: 0
+  left_wrist_roll_joint: 0
+  left_wrist_pitch_joint: 0
+  left_wrist_yaw_joint: 0
+  right_shoulder_pitch_joint: 0
+  right_shoulder_roll_joint: 0
+  right_shoulder_yaw_joint: 0
+  right_elbow_joint: 0
+  right_wrist_roll_joint: 0
+  right_wrist_pitch_joint: 0
+  right_wrist_yaw_joint: 0
+  L_thumb_proximal_yaw_joint: 0
+  L_thumb_proximal_pitch_joint: 0
+  L_index_proximal_joint: 0
+  L_middle_proximal_joint: 0
+  L_ring_proximal_joint: 0
+  L_pinky_proximal_joint: 0
+  R_thumb_proximal_yaw_joint: 0
+  R_thumb_proximal_pitch_joint: 0
+  R_index_proximal_joint: 0
+  R_middle_proximal_joint: 0
+  R_ring_proximal_joint: 0
+  R_pinky_proximal_joint: 0
