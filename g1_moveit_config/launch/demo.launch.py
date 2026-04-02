@@ -1,5 +1,6 @@
-import os
+from pathlib import Path
 
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
@@ -47,15 +48,15 @@ def _launch_setup(context, *args, **kwargs):
     cfg = _MODEL_CONFIG[hand_type]
 
     moveit_config = (
-        MoveItConfigsBuilder("g1_29dof_with_hand", package_name="g1_moveit_config")
+        MoveItConfigsBuilder("g1_29dof", package_name="g1_moveit_config")
         .robot_description(file_path=f"config/{cfg['urdf_xacro']}")
         .robot_description_semantic(file_path=f"config/{cfg['srdf']}")
         .trajectory_execution(file_path=f"config/{cfg['moveit_controllers']}")
         .to_moveit_configs()
     )
 
-    package_path = moveit_config.package_path
-    ros2_controllers_yaml = str(package_path / f"config/{cfg['ros2_controllers']}")
+    g1_hw_share = Path(get_package_share_directory("g1_hardware"))
+    ros2_controllers_yaml = str(g1_hw_share / f"config/{cfg['ros2_controllers']}")
 
     actions = []
 
@@ -104,7 +105,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "hand_type",
-                default_value="with_hand",
+                default_value="no_hand",
                 choices=["no_hand", "with_hand", "inspire_ftp", "inspire_dfq"],
                 description=(
                     "G1 hand type: no_hand, with_hand (standard), "

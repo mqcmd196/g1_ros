@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="g1_29dof">
+    <!--
+      URDF xacro for G1 (no hand) with real hardware interface.
+      network_interface is passed in from the launch file.
+    -->
+    <xacro:arg name="network_interface" default="eth0"/>
+    <xacro:arg name="kp"          default="60.0"/>
+    <xacro:arg name="kd"          default="1.5"/>
+    <xacro:arg name="weight_rate" default="0.2"/>
+
+    <xacro:include filename="$(find g1_description)/g1_29dof.urdf"/>
+    <xacro:include filename="g1_no_hand_real.ros2_control.xacro"/>
+
+    <xacro:g1_ros2_control
+        name="G1RealSystem"
+        network_interface="$(arg network_interface)"
+        kp="$(arg kp)"
+        kd="$(arg kd)"
+        weight_rate="$(arg weight_rate)"/>
+</robot>
