@@ -133,9 +133,10 @@ hardware_interface::CallbackReturn G1HardwareInterface::on_activate(
     new unitree::robot::ChannelPublisher<unitree_hg::msg::dds_::LowCmd_>(kTopicArmSdk));
   arm_sdk_publisher_->InitChannel();
 
-  // Start with weight = 0 and ramp up in write()
+  // Start with weight = 0; ramp up only when controllers become active
   weight_ = 0.0f;
   deactivating_ = false;
+  active_command_interfaces_ = 0;
 
   RCLCPP_INFO(rclcpp::get_logger("G1HardwareInterface"),
     "Activated. Weight will ramp up to 1.0 over %.1f s.",
@@ -150,13 +151,23 @@ hardware_interface::CallbackReturn G1HardwareInterface::on_deactivate(
     "Deactivating... ramping down control weight.");
   deactivating_ = true;
 
-  // Blocking ramp-down so the robot stops smoothly before we return
+  // Blocking ramp-down: keep sending last commanded positions while weight → 0
   constexpr float dt = 0.02f;
   const float delta = weight_rate_ * dt;
-  unitree_hg::msg::dds_::LowCmd_ cmd{};
   while (weight_ > 0.0f) {
     weight_ = std::max(0.0f, weight_ - delta);
+
+    unitree_hg::msg::dds_::LowCmd_ cmd{};
     cmd.motor_cmd().at(kWeightJoint).q(weight_);
+    for (size_t i = 0; i < info_.joints.size(); ++i) {
+      if (info_.joints[i].command_interfaces.empty()) continue;
+      auto & mc = cmd.motor_cmd().at(sdk_indices_[i]);
+      mc.q(static_cast<float>(hw_commands_[i]));
+      mc.dq(0.0f);
+      mc.kp(kp_);
+      mc.kd(kd_);
+      mc.tau(0.0f);
+    }
     arm_sdk_publisher_->Write(cmd);
     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(dt * 1000)));
   }
@@ -181,6 +192,22 @@ hardware_interface::return_type G1HardwareInterface::read(
   return hardware_interface::return_type::OK;
 }
 
+hardware_interface::return_type G1HardwareInterface::perform_command_mode_switch(
+  const std::vector<std::string> & start_interfaces,
+  const std::vector<std::string> & stop_interfaces)
+{
+  active_command_interfaces_ += static_cast<int>(start_interfaces.size());
+  active_command_interfaces_ -= static_cast<int>(stop_interfaces.size());
+  active_command_interfaces_ = std::max(0, active_command_interfaces_);
+
+  RCLCPP_INFO(rclcpp::get_logger("G1HardwareInterface"),
+    "Command mode switch: %zu started, %zu stopped → %d active. Weight will %s.",
+    start_interfaces.size(), stop_interfaces.size(), active_command_interfaces_,
+    active_command_interfaces_ > 0 ? "ramp UP" : "ramp DOWN");
+
+  return hardware_interface::return_type::OK;
+}
+
 hardware_interface::return_type G1HardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
 {
@@ -188,9 +215,13 @@ hardware_interface::return_type G1HardwareInterface::write(
     return hardware_interface::return_type::OK;
   }
 
-  // Gradually ramp weight up to 1.0
+  // Ramp weight up when controllers are active, down when all are inactive
   const float dt = static_cast<float>(period.seconds());
-  weight_ = std::min(1.0f, weight_ + weight_rate_ * dt);
+  if (active_command_interfaces_ > 0) {
+    weight_ = std::min(1.0f, weight_ + weight_rate_ * dt);
+  } else {
+    weight_ = std::max(0.0f, weight_ - weight_rate_ * dt);
+  }
 
   unitree_hg::msg::dds_::LowCmd_ cmd{};
   cmd.motor_cmd().at(kWeightJoint).q(weight_);

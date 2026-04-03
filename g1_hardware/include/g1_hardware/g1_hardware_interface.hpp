@@ -107,6 +107,10 @@ public:
   hardware_interface::CallbackReturn on_deactivate(
     const rclcpp_lifecycle::State & previous_state) override;
 
+  hardware_interface::return_type perform_command_mode_switch(
+    const std::vector<std::string> & start_interfaces,
+    const std::vector<std::string> & stop_interfaces) override;
+
   hardware_interface::return_type read(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
@@ -129,6 +133,7 @@ private:
   // Weight ramp state
   float weight_{0.0f};
   bool  deactivating_{false};
+  int   active_command_interfaces_{0};  // incremented/decremented by perform_command_mode_switch
 
   // DDS
   unitree::robot::ChannelPublisherPtr<unitree_hg::msg::dds_::LowCmd_>   arm_sdk_publisher_;
