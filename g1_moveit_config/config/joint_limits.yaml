@@ -81,6 +81,22 @@ joint_limits:
     max_velocity: 22.0
     has_acceleration_limits: true
     max_acceleration: 100.0
+  # Waist
+  waist_yaw_joint:
+    has_velocity_limits: true
+    max_velocity: 32.0
+    has_acceleration_limits: true
+    max_acceleration: 100.0
+  waist_roll_joint:
+    has_velocity_limits: true
+    max_velocity: 30.0
+    has_acceleration_limits: true
+    max_acceleration: 100.0
+  waist_pitch_joint:
+    has_velocity_limits: true
+    max_velocity: 30.0
+    has_acceleration_limits: true
+    max_acceleration: 100.0
   # Left gripper
   left_hand_thumb_0_joint:
     has_velocity_limits: true

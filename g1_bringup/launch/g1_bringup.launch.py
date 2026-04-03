@@ -31,9 +31,7 @@ _HARDWARE_CONFIG = {
         "moveit_controllers": "moveit_controllers_no_hand.yaml",
         "controllers": [
             "joint_state_broadcaster",
-            "left_arm_controller",
-            "right_arm_controller",
-            "waist_controller",
+            "upper_body_controller",
         ],
     },
 }
@@ -91,7 +89,7 @@ def _launch_setup(context, *args, **kwargs):
     # Activate them explicitly before executing a MoveIt trajectory:
     #   ros2 control set_controller_state left_arm_controller active
     #   ros2 control set_controller_state right_arm_controller active
-    _ARM_CONTROLLERS = {"left_arm_controller", "right_arm_controller", "waist_controller"}
+    _ARM_CONTROLLERS = {"upper_body_controller"}
     spawners = [
         Node(
             package="controller_manager",
