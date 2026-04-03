@@ -70,16 +70,19 @@
                 <state_interface name="velocity"/>
             </joint>
 
-            <!-- Waist joints (state-only) -->
+            <!-- Waist joints (arm SDK controls waist + arms together) -->
             <joint name="waist_yaw_joint">
+                <command_interface name="position"/>
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
             </joint>
             <joint name="waist_roll_joint">
+                <command_interface name="position"/>
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
             </joint>
             <joint name="waist_pitch_joint">
+                <command_interface name="position"/>
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
             </joint>

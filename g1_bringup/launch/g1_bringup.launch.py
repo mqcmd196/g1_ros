@@ -33,6 +33,7 @@ _HARDWARE_CONFIG = {
             "joint_state_broadcaster",
             "left_arm_controller",
             "right_arm_controller",
+            "waist_controller",
         ],
     },
 }
@@ -86,11 +87,16 @@ def _launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
+    # Arm controllers start inactive so no hold commands are sent at startup.
+    # Activate them explicitly before executing a MoveIt trajectory:
+    #   ros2 control set_controller_state left_arm_controller active
+    #   ros2 control set_controller_state right_arm_controller active
+    _ARM_CONTROLLERS = {"left_arm_controller", "right_arm_controller", "waist_controller"}
     spawners = [
         Node(
             package="controller_manager",
             executable="spawner",
-            arguments=[name],
+            arguments=[name] + (["--inactive"] if name in _ARM_CONTROLLERS else []),
         )
         for name in cfg["controllers"]
     ]
