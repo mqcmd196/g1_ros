@@ -19,7 +19,25 @@
 namespace g1_hardware
 {
 
-// SDK joint indices for the G1 29DoF arms
+// SDK joint indices for the G1 29DoF (legs, waist, arms)
+// Legs
+static constexpr int kLeftHipPitch       =  0;
+static constexpr int kLeftHipRoll        =  1;
+static constexpr int kLeftHipYaw         =  2;
+static constexpr int kLeftKnee           =  3;
+static constexpr int kLeftAnklePitch     =  4;
+static constexpr int kLeftAnkleRoll      =  5;
+static constexpr int kRightHipPitch      =  6;
+static constexpr int kRightHipRoll       =  7;
+static constexpr int kRightHipYaw        =  8;
+static constexpr int kRightKnee          =  9;
+static constexpr int kRightAnklePitch    = 10;
+static constexpr int kRightAnkleRoll     = 11;
+// Waist
+static constexpr int kWaistYaw           = 12;
+static constexpr int kWaistRoll          = 13;
+static constexpr int kWaistPitch         = 14;
+// Arms
 static constexpr int kLeftShoulderPitch  = 15;
 static constexpr int kLeftShoulderRoll   = 16;
 static constexpr int kLeftShoulderYaw    = 17;
@@ -38,6 +56,24 @@ static constexpr int kRightWristYaw      = 28;
 static constexpr int kWeightJoint        = 29;
 
 static const std::unordered_map<std::string, int> kJointNameToSdkIndex = {
+  // Legs (state-only)
+  {"left_hip_pitch_joint",       kLeftHipPitch},
+  {"left_hip_roll_joint",        kLeftHipRoll},
+  {"left_hip_yaw_joint",         kLeftHipYaw},
+  {"left_knee_joint",            kLeftKnee},
+  {"left_ankle_pitch_joint",     kLeftAnklePitch},
+  {"left_ankle_roll_joint",      kLeftAnkleRoll},
+  {"right_hip_pitch_joint",      kRightHipPitch},
+  {"right_hip_roll_joint",       kRightHipRoll},
+  {"right_hip_yaw_joint",        kRightHipYaw},
+  {"right_knee_joint",           kRightKnee},
+  {"right_ankle_pitch_joint",    kRightAnklePitch},
+  {"right_ankle_roll_joint",     kRightAnkleRoll},
+  // Waist (state-only)
+  {"waist_yaw_joint",            kWaistYaw},
+  {"waist_roll_joint",           kWaistRoll},
+  {"waist_pitch_joint",          kWaistPitch},
+  // Arms (state + command)
   {"left_shoulder_pitch_joint",  kLeftShoulderPitch},
   {"left_shoulder_roll_joint",   kLeftShoulderRoll},
   {"left_shoulder_yaw_joint",    kLeftShoulderYaw},

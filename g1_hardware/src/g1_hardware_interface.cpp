@@ -79,6 +79,9 @@ G1HardwareInterface::export_command_interfaces()
 {
   std::vector<hardware_interface::CommandInterface> ci;
   for (size_t i = 0; i < info_.joints.size(); ++i) {
+    if (info_.joints[i].command_interfaces.empty()) {
+      continue;  // state-only joints (legs, waist) — no command interface
+    }
     ci.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_commands_[i]);
   }
   return ci;
@@ -193,6 +196,9 @@ hardware_interface::return_type G1HardwareInterface::write(
   cmd.motor_cmd().at(kWeightJoint).q(weight_);
 
   for (size_t i = 0; i < info_.joints.size(); ++i) {
+    if (info_.joints[i].command_interfaces.empty()) {
+      continue;  // state-only joints (legs, waist) — skip
+    }
     auto & mc = cmd.motor_cmd().at(sdk_indices_[i]);
     mc.q(static_cast<float>(hw_commands_[i]));
     mc.dq(0.0f);

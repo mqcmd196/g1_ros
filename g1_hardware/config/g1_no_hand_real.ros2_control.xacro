@@ -18,6 +18,72 @@
                 <param name="weight_rate">${weight_rate}</param>
             </hardware>
 
+            <!-- Left leg joints (state-only — controlled by onboard locomotion controller) -->
+            <joint name="left_hip_pitch_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="left_hip_roll_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="left_hip_yaw_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="left_knee_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="left_ankle_pitch_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="left_ankle_roll_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+
+            <!-- Right leg joints (state-only) -->
+            <joint name="right_hip_pitch_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="right_hip_roll_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="right_hip_yaw_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="right_knee_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="right_ankle_pitch_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="right_ankle_roll_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+
+            <!-- Waist joints (state-only) -->
+            <joint name="waist_yaw_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="waist_roll_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="waist_pitch_joint">
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+
             <!-- Left arm joints -->
             <joint name="left_shoulder_pitch_joint">
                 <command_interface name="position"/>
