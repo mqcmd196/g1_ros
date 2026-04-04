@@ -7,9 +7,8 @@
     <xacro:arg name="network_interface" default="eth0"/>
     <xacro:arg name="kp"          default="60.0"/>
     <xacro:arg name="kd"          default="1.5"/>
-    <xacro:arg name="waist_kp"    default="100.0"/>
+    <xacro:arg name="waist_kp"    default="200.0"/>
     <xacro:arg name="waist_kd"    default="2.0"/>
-    <xacro:arg name="weight_rate" default="0.2"/>
 
     <xacro:include filename="$(find g1_description)/g1_29dof.urdf"/>
     <xacro:include filename="g1_no_hand_real.ros2_control.xacro"/>
@@ -20,6 +19,5 @@
         kp="$(arg kp)"
         kd="$(arg kd)"
         waist_kp="$(arg waist_kp)"
-        waist_kd="$(arg waist_kd)"
-        weight_rate="$(arg weight_rate)"/>
+        waist_kd="$(arg waist_kd)"/>
 </robot>

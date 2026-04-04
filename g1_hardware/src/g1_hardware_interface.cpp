@@ -39,10 +39,6 @@ hardware_interface::CallbackReturn G1HardwareInterface::on_init(
   if (info.hardware_parameters.count("waist_kd")) {
     waist_kd_ = std::stof(info.hardware_parameters.at("waist_kd"));
   }
-  if (info.hardware_parameters.count("weight_rate")) {
-    weight_rate_ = std::stof(info.hardware_parameters.at("weight_rate"));
-  }
-
   // -- Map joint names to SDK indices --
   const size_t n = info_.joints.size();
   sdk_indices_.resize(n, -1);

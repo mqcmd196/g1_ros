@@ -7,7 +7,7 @@
       kp, kd:           position/velocity gains sent to each motor.
       weight_rate:      how fast (weight units/s) to ramp the arm SDK control weight.
     -->
-    <xacro:macro name="g1_ros2_control" params="name network_interface kp:=60.0 kd:=1.5 waist_kp:=100.0 waist_kd:=2.0 weight_rate:=0.2">
+    <xacro:macro name="g1_ros2_control" params="name network_interface kp:=60.0 kd:=1.5 waist_kp:=200.0 waist_kd:=2.0">
 
         <ros2_control name="${name}" type="system">
             <hardware>
@@ -17,7 +17,6 @@
                 <param name="kd">${kd}</param>
                 <param name="waist_kp">${waist_kp}</param>
                 <param name="waist_kd">${waist_kd}</param>
-                <param name="weight_rate">${weight_rate}</param>
             </hardware>
 
             <!-- Left leg joints (state-only — controlled by onboard locomotion controller) -->

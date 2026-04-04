@@ -45,8 +45,7 @@ def _launch_setup(context, *args, **kwargs):
     kp          = LaunchConfiguration("kp").perform(context)
     kd          = LaunchConfiguration("kd").perform(context)
     waist_kp    = LaunchConfiguration("waist_kp").perform(context)
-    waist_kd    = LaunchConfiguration("waist_kd").perform(context)
-    weight_rate = LaunchConfiguration("weight_rate").perform(context)
+    waist_kd = LaunchConfiguration("waist_kd").perform(context)
 
     g1_hw_share = Path(get_package_share_directory("g1_hardware"))
 
@@ -58,8 +57,7 @@ def _launch_setup(context, *args, **kwargs):
             "kp":          kp,
             "kd":          kd,
             "waist_kp":    waist_kp,
-            "waist_kd":    waist_kd,
-            "weight_rate": weight_rate,
+            "waist_kd": waist_kd,
         },
     ).toxml()
 
@@ -98,11 +96,9 @@ def generate_launch_description():
                               description="Arm position gain"),
         DeclareLaunchArgument("kd",          default_value="1.5",
                               description="Arm velocity (damping) gain"),
-        DeclareLaunchArgument("waist_kp",    default_value="100.0",
+        DeclareLaunchArgument("waist_kp",    default_value="200.0",
                               description="Waist position gain"),
-        DeclareLaunchArgument("waist_kd",    default_value="2.0",
+        DeclareLaunchArgument("waist_kd", default_value="2.0",
                               description="Waist velocity (damping) gain"),
-        DeclareLaunchArgument("weight_rate", default_value="0.2",
-                              description="Arm SDK control weight ramp rate (weight/s)"),
         OpaqueFunction(function=_launch_setup),
     ])
