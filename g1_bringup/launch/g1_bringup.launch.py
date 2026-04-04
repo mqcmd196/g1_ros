@@ -42,6 +42,8 @@ def _launch_setup(context, *args, **kwargs):
     network_interface = LaunchConfiguration("network_interface").perform(context)
     kp              = LaunchConfiguration("kp").perform(context)
     kd              = LaunchConfiguration("kd").perform(context)
+    waist_kp        = LaunchConfiguration("waist_kp").perform(context)
+    waist_kd        = LaunchConfiguration("waist_kd").perform(context)
     weight_rate     = LaunchConfiguration("weight_rate").perform(context)
     use_rviz        = LaunchConfiguration("use_rviz").perform(context).lower()
 
@@ -59,6 +61,8 @@ def _launch_setup(context, *args, **kwargs):
                 "network_interface": network_interface,
                 "kp":          kp,
                 "kd":          kd,
+                "waist_kp":    waist_kp,
+                "waist_kd":    waist_kd,
                 "weight_rate": weight_rate,
             },
         )
@@ -81,6 +85,8 @@ def _launch_setup(context, *args, **kwargs):
             "network_interface": network_interface,
             "kp":               kp,
             "kd":               kd,
+            "waist_kp":         waist_kp,
+            "waist_kd":         waist_kd,
             "weight_rate":      weight_rate,
         }.items(),
     )
@@ -125,9 +131,13 @@ def generate_launch_description():
             description="Network interface connected to the G1 robot (e.g. 'eth0')",
         ),
         DeclareLaunchArgument("kp",          default_value="60.0",
-                              description="Position gain"),
+                              description="Arm position gain"),
         DeclareLaunchArgument("kd",          default_value="1.5",
-                              description="Velocity (damping) gain"),
+                              description="Arm velocity (damping) gain"),
+        DeclareLaunchArgument("waist_kp",    default_value="100.0",
+                              description="Waist position gain"),
+        DeclareLaunchArgument("waist_kd",    default_value="2.0",
+                              description="Waist velocity (damping) gain"),
         DeclareLaunchArgument("weight_rate", default_value="0.2",
                               description="Arm SDK control weight ramp rate (weight/s)"),
         DeclareLaunchArgument("use_rviz",    default_value="true",

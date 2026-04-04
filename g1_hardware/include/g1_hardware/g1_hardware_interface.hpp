@@ -122,6 +122,8 @@ private:
   std::string network_interface_;
   float kp_{60.0f};
   float kd_{1.5f};
+  float waist_kp_{100.0f};
+  float waist_kd_{2.0f};
   float weight_rate_{0.2f};   // weight units per second
 
   // Per-joint data (indexed by info_.joints order)

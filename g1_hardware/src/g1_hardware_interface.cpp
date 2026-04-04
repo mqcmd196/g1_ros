@@ -33,6 +33,12 @@ hardware_interface::CallbackReturn G1HardwareInterface::on_init(
   if (info.hardware_parameters.count("kd")) {
     kd_ = std::stof(info.hardware_parameters.at("kd"));
   }
+  if (info.hardware_parameters.count("waist_kp")) {
+    waist_kp_ = std::stof(info.hardware_parameters.at("waist_kp"));
+  }
+  if (info.hardware_parameters.count("waist_kd")) {
+    waist_kd_ = std::stof(info.hardware_parameters.at("waist_kd"));
+  }
   if (info.hardware_parameters.count("weight_rate")) {
     weight_rate_ = std::stof(info.hardware_parameters.at("weight_rate"));
   }
@@ -58,8 +64,8 @@ hardware_interface::CallbackReturn G1HardwareInterface::on_init(
   }
 
   RCLCPP_INFO(rclcpp::get_logger("G1HardwareInterface"),
-    "Initialized: network_interface=%s, kp=%.1f, kd=%.2f",
-    network_interface_.c_str(), kp_, kd_);
+    "Initialized: network_interface=%s, kp=%.1f, kd=%.2f, waist_kp=%.1f, waist_kd=%.2f",
+    network_interface_.c_str(), kp_, kd_, waist_kp_, waist_kd_);
   return CallbackReturn::SUCCESS;
 }
 
@@ -164,8 +170,11 @@ hardware_interface::CallbackReturn G1HardwareInterface::on_deactivate(
       auto & mc = cmd.motor_cmd().at(sdk_indices_[i]);
       mc.q(static_cast<float>(hw_commands_[i]));
       mc.dq(0.0f);
-      mc.kp(kp_);
-      mc.kd(kd_);
+      const bool is_waist = (sdk_indices_[i] == kWaistYaw ||
+                             sdk_indices_[i] == kWaistRoll ||
+                             sdk_indices_[i] == kWaistPitch);
+      mc.kp(is_waist ? waist_kp_ : kp_);
+      mc.kd(is_waist ? waist_kd_ : kd_);
       mc.tau(0.0f);
     }
     arm_sdk_publisher_->Write(cmd);
@@ -233,8 +242,11 @@ hardware_interface::return_type G1HardwareInterface::write(
     auto & mc = cmd.motor_cmd().at(sdk_indices_[i]);
     mc.q(static_cast<float>(hw_commands_[i]));
     mc.dq(0.0f);
-    mc.kp(kp_);
-    mc.kd(kd_);
+    const bool is_waist = (sdk_indices_[i] == kWaistYaw ||
+                           sdk_indices_[i] == kWaistRoll ||
+                           sdk_indices_[i] == kWaistPitch);
+    mc.kp(is_waist ? waist_kp_ : kp_);
+    mc.kd(is_waist ? waist_kd_ : kd_);
     mc.tau(0.0f);
   }
 
