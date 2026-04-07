@@ -1,0 +1,9 @@
+repositories:
+  unitreerobotics/unitree_ros:
+    type: git
+    url: https://github.com/mqcmd196/unitree_ros
+    version: description-package
+  unitreerobotics/unitree_sdk2:
+    type: git
+    url: https://github.com/mqcmd196/unitree_sdk2.git
+    version: add-package-xml
