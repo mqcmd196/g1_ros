@@ -25,43 +25,43 @@ from moveit_configs_utils.launches import (
 )
 
 _HARDWARE_CONFIG = {
-    "no_hand": {
-        "urdf_xacro":        "g1_no_hand_real.urdf.xacro",
-        "srdf":               "g1_no_hand.srdf",
-        "moveit_controllers": "moveit_controllers_no_hand.yaml",
-        "controllers": [
-            "joint_state_broadcaster",
-            "upper_body_controller",
+    'no_hand': {
+        'urdf_xacro': 'g1_no_hand_real.urdf.xacro',
+        'srdf': 'g1_no_hand.srdf',
+        'moveit_controllers': 'moveit_controllers_no_hand.yaml',
+        'controllers': [
+            'joint_state_broadcaster',
+            'upper_body_controller',
         ],
     },
 }
 
 
 def _launch_setup(context, *args, **kwargs):
-    hand_type       = LaunchConfiguration("hand_type").perform(context)
-    network_interface = LaunchConfiguration("network_interface").perform(context)
-    kp              = LaunchConfiguration("kp").perform(context)
-    kd              = LaunchConfiguration("kd").perform(context)
-    waist_kp        = LaunchConfiguration("waist_kp").perform(context)
-    waist_kd        = LaunchConfiguration("waist_kd").perform(context)
-    use_rviz        = LaunchConfiguration("use_rviz").perform(context).lower()
+    hand_type = LaunchConfiguration('hand_type').perform(context)
+    network_interface = LaunchConfiguration('network_interface').perform(context)
+    kp = LaunchConfiguration('kp').perform(context)
+    kd = LaunchConfiguration('kd').perform(context)
+    waist_kp = LaunchConfiguration('waist_kp').perform(context)
+    waist_kd = LaunchConfiguration('waist_kd').perform(context)
+    use_rviz = LaunchConfiguration('use_rviz').perform(context).lower()
 
     cfg = _HARDWARE_CONFIG[hand_type]
 
-    g1_hw_share     = Path(get_package_share_directory("g1_hardware"))
-    g1_moveit_share = Path(get_package_share_directory("g1_moveit_config"))
+    g1_hw_share = Path(get_package_share_directory('g1_hardware'))
+    g1_moveit_share = Path(get_package_share_directory('g1_moveit_config'))
 
     # Build moveit_config for MoveIt nodes (RSP is handled by hardware launch)
     moveit_config = (
-        MoveItConfigsBuilder("g1_29dof", package_name="g1_moveit_config")
+        MoveItConfigsBuilder('g1_29dof', package_name='g1_moveit_config')
         .robot_description(
             file_path=str(g1_hw_share / f"config/{cfg['urdf_xacro']}"),
             mappings={
-                "network_interface": network_interface,
-                "kp":          kp,
-                "kd":          kd,
-                "waist_kp":    waist_kp,
-                "waist_kd":    waist_kd,
+                'network_interface': network_interface,
+                'kp': kp,
+                'kd': kd,
+                'waist_kp': waist_kp,
+                'waist_kd': waist_kd,
             },
         )
         .robot_description_semantic(
@@ -76,15 +76,15 @@ def _launch_setup(context, *args, **kwargs):
     # Hardware driver (RSP + ros2_control_node + spawners)
     hw_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            str(g1_hw_share / "launch/hardware.launch.py")
+            str(g1_hw_share / 'launch/hardware.launch.py')
         ),
         launch_arguments={
-            "hand_type":        hand_type,
-            "network_interface": network_interface,
-            "kp":               kp,
-            "kd":               kd,
-            "waist_kp":         waist_kp,
-            "waist_kd":         waist_kd,
+            'hand_type': hand_type,
+            'network_interface': network_interface,
+            'kp': kp,
+            'kd': kd,
+            'waist_kp': waist_kp,
+            'waist_kd': waist_kd,
         }.items(),
     )
 
@@ -92,14 +92,14 @@ def _launch_setup(context, *args, **kwargs):
     # Activate them explicitly before executing a MoveIt trajectory:
     #   ros2 control set_controller_state left_arm_controller active
     #   ros2 control set_controller_state right_arm_controller active
-    _ARM_CONTROLLERS = {"upper_body_controller"}
+    _ARM_CONTROLLERS = {'upper_body_controller'}
     spawners = [
         Node(
-            package="controller_manager",
-            executable="spawner",
-            arguments=[name] + (["--inactive"] if name in _ARM_CONTROLLERS else []),
+            package='controller_manager',
+            executable='spawner',
+            arguments=[name] + (['--inactive'] if name in _ARM_CONTROLLERS else []),
         )
-        for name in cfg["controllers"]
+        for name in cfg['controllers']
     ]
 
     actions = [
@@ -109,7 +109,7 @@ def _launch_setup(context, *args, **kwargs):
         *generate_move_group_launch(moveit_config).entities,
     ]
 
-    if use_rviz not in ("false", "0"):
+    if use_rviz not in ('false', '0'):
         actions.extend(generate_moveit_rviz_launch(moveit_config).entities)
 
     return actions
@@ -118,24 +118,24 @@ def _launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
-            "hand_type",
-            default_value="no_hand",
+            'hand_type',
+            default_value='no_hand',
             choices=list(_HARDWARE_CONFIG),
-            description="G1 hand configuration",
+            description='G1 hand configuration',
         ),
         DeclareLaunchArgument(
-            "network_interface",
+            'network_interface',
             description="Network interface connected to the G1 robot (e.g. 'eth0')",
         ),
-        DeclareLaunchArgument("kp",          default_value="60.0",
-                              description="Arm position gain"),
-        DeclareLaunchArgument("kd",          default_value="1.5",
-                              description="Arm velocity (damping) gain"),
-        DeclareLaunchArgument("waist_kp",    default_value="200.0",
-                              description="Waist position gain"),
-        DeclareLaunchArgument("waist_kd",    default_value="2.0",
-                              description="Waist velocity (damping) gain"),
-        DeclareLaunchArgument("use_rviz",    default_value="true",
-                              description="Launch RViz with MoveIt plugin"),
+        DeclareLaunchArgument('kp', default_value='60.0',
+                              description='Arm position gain'),
+        DeclareLaunchArgument('kd', default_value='1.5',
+                              description='Arm velocity (damping) gain'),
+        DeclareLaunchArgument('waist_kp', default_value='200.0',
+                              description='Waist position gain'),
+        DeclareLaunchArgument('waist_kd', default_value='2.0',
+                              description='Waist velocity (damping) gain'),
+        DeclareLaunchArgument('use_rviz', default_value='true',
+                              description='Launch RViz with MoveIt plugin'),
         OpaqueFunction(function=_launch_setup),
     ])
