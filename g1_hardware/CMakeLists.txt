@@ -26,6 +26,16 @@ pluginlib_export_plugin_description_file(hardware_interface g1_hardware_plugin.x
 install(FILES g1_hardware_plugin.xml
   DESTINATION share/${PROJECT_NAME})
 
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  set(ament_cmake_cppcheck_FOUND TRUE)
+  set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_uncrustify_FOUND TRUE)
+  set(ament_cmake_clang_format_CONFIG_FILE .clang-format)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
 ament_auto_package(
   INSTALL_TO_SHARE config launch
 )

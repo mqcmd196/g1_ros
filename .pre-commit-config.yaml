@@ -1,0 +1,33 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ament_clang_format
+        name: ament_clang_format
+        description: Code style checking using clang-format.
+        language: system
+        types: [c++]
+        entry: ament_clang_format --config .clang-format --reformat
+      - id: ament_flake8
+        name: ament_flake8
+        description: Check Python code style using flake8.
+        language: system
+        types: [python]
+        entry: ament_flake8
+      - id: ament_lint_cmake
+        name: ament_lint_cmake
+        description: Check CMake code style using cmakelint.
+        language: system
+        types: [cmake]
+        entry: ament_lint_cmake
+      - id: ament_pep257
+        name: ament_pep257
+        description: Check Python code style using pep257.
+        language: system
+        types: [python]
+        entry: ament_pep257
+      - id: ament_xmllint
+        name: ament_xmllint
+        description: Check XML markup using xmllint.
+        language: system
+        types: [xml]
+        entry: ament_xmllint
