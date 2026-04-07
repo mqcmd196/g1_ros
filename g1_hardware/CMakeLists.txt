@@ -28,11 +28,11 @@ install(FILES g1_hardware_plugin.xml
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cppcheck_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
-  set(ament_cmake_uncrustify_FOUND TRUE)
+set(ament_cmake_uncrustify_FOUND TRUE)
   set(ament_cmake_clang_format_CONFIG_FILE .clang-format)
+  set(ament_cmake_clang_tidy_CONFIG_FILE .clang-tidy)
   ament_lint_auto_find_test_dependencies()
 endif()
 
