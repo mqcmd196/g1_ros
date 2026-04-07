@@ -38,7 +38,7 @@ ros2 control set_controller_state upper_body_controller active
 ### Prerequisite
 
 ```shell
-sudo apt install black isort libxml2-utils
+sudo apt install black isort libxml2-utils pre-commit
 ```
 
 ### Pre-commit
