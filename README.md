@@ -32,3 +32,20 @@ To activate ROS controller
 ```shell
 ros2 control set_controller_state upper_body_controller active
 ```
+
+## Contribution
+
+Make sure `pre-commit` is run before commit.
+
+If you want to execute `pre-commit` automatically:
+
+```shell
+cd g1_ros
+pre-commit install
+```
+
+If you want to execute `pre-commit` manually:
+
+```shell
+pre-commit run --all-files
+```
