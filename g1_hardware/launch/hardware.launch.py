@@ -109,24 +109,32 @@ def _launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'hand_type',
-            default_value='no_hand',
-            choices=list(_HARDWARE_CONFIG),
-            description='G1 hand configuration',
-        ),
-        DeclareLaunchArgument(
-            'network_interface',
-            description="Network interface connected to the G1 robot (e.g. 'eth0')",
-        ),
-        DeclareLaunchArgument('kp', default_value='60.0',
-                              description='Arm position gain'),
-        DeclareLaunchArgument('kd', default_value='1.5',
-                              description='Arm velocity (damping) gain'),
-        DeclareLaunchArgument('waist_kp', default_value='200.0',
-                              description='Waist position gain'),
-        DeclareLaunchArgument('waist_kd', default_value='2.0',
-                              description='Waist velocity (damping) gain'),
-        OpaqueFunction(function=_launch_setup),
-    ])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                'hand_type',
+                default_value='no_hand',
+                choices=list(_HARDWARE_CONFIG),
+                description='G1 hand configuration',
+            ),
+            DeclareLaunchArgument(
+                'network_interface',
+                description="Network interface connected to the G1 robot (e.g. 'eth0')",
+            ),
+            DeclareLaunchArgument(
+                'kp', default_value='60.0', description='Arm position gain'
+            ),
+            DeclareLaunchArgument(
+                'kd', default_value='1.5', description='Arm velocity (damping) gain'
+            ),
+            DeclareLaunchArgument(
+                'waist_kp', default_value='200.0', description='Waist position gain'
+            ),
+            DeclareLaunchArgument(
+                'waist_kd',
+                default_value='2.0',
+                description='Waist velocity (damping) gain',
+            ),
+            OpaqueFunction(function=_launch_setup),
+        ]
+    )

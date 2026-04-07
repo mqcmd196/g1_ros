@@ -89,9 +89,7 @@ def _launch_setup(context, *args, **kwargs):
     actions = []
 
     # Static TF for virtual joints
-    actions.extend(
-        generate_static_virtual_joint_tfs_launch(moveit_config).entities
-    )
+    actions.extend(generate_static_virtual_joint_tfs_launch(moveit_config).entities)
 
     # Robot state publisher
     actions.extend(generate_rsp_launch(moveit_config).entities)
@@ -123,6 +121,7 @@ def _launch_setup(context, *args, **kwargs):
     db = context.launch_configurations.get('db', 'false').lower()
     if db not in ('false', '0'):
         from moveit_configs_utils.launches import generate_warehouse_db_launch
+
         actions.extend(generate_warehouse_db_launch(moveit_config).entities)
 
     return actions

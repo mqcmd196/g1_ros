@@ -7,6 +7,18 @@ repos:
         language: system
         types: [c++]
         entry: ament_clang_format --config .clang-format --reformat
+      - id: isort
+        name: isort
+        description: Sort Python imports.
+        language: system
+        types: [python]
+        entry: isort --profile black --force-sort-within-sections
+      - id: black
+        name: black
+        description: Format Python code.
+        language: system
+        types: [python]
+        entry: black --skip-string-normalization
       - id: ament_flake8
         name: ament_flake8
         description: Check Python code style using flake8.
@@ -25,6 +37,12 @@ repos:
         language: system
         types: [python]
         entry: ament_pep257
+      - id: xmllint_format
+        name: xmllint_format
+        description: Format XML files using xmllint.
+        language: system
+        types: [xml]
+        entry: bash -c 'for f in "$@"; do xmllint --format --output "$f" "$f"; done' --
       - id: ament_xmllint
         name: ament_xmllint
         description: Check XML markup using xmllint.

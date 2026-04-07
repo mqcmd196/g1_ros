@@ -1,14 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="g1_29dof_with_hand">
-    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
-    <xacro:arg name="model" default="g1_29dof_with_hand" />
-
-    <!-- Import g1 urdf file (model arg selects which URDF to load) -->
-    <xacro:include filename="$(find g1_description)/$(arg model).urdf" />
-
-    <!-- Import ros2_control xacro -->
-    <xacro:include filename="g1_29dof_with_hand.ros2_control.xacro" />
-
-    <xacro:g1_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
-
+  <xacro:arg name="initial_positions_file" default="initial_positions.yaml"/>
+  <xacro:arg name="model" default="g1_29dof_with_hand"/>
+  <!-- Import g1 urdf file (model arg selects which URDF to load) -->
+  <xacro:include filename="$(find g1_description)/$(arg model).urdf"/>
+  <!-- Import ros2_control xacro -->
+  <xacro:include filename="g1_29dof_with_hand.ros2_control.xacro"/>
+  <xacro:g1_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
 </robot>

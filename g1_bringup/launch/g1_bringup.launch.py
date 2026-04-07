@@ -41,7 +41,11 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -103,9 +107,7 @@ def _launch_setup(context, *args, **kwargs):
 
     # Hardware driver (RSP + ros2_control_node + spawners)
     hw_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            str(g1_hw_share / 'launch/hardware.launch.py')
-        ),
+        PythonLaunchDescriptionSource(str(g1_hw_share / 'launch/hardware.launch.py')),
         launch_arguments={
             'hand_type': hand_type,
             'network_interface': network_interface,
@@ -144,26 +146,37 @@ def _launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'hand_type',
-            default_value='no_hand',
-            choices=list(_HARDWARE_CONFIG),
-            description='G1 hand configuration',
-        ),
-        DeclareLaunchArgument(
-            'network_interface',
-            description="Network interface connected to the G1 robot (e.g. 'eth0')",
-        ),
-        DeclareLaunchArgument('kp', default_value='60.0',
-                              description='Arm position gain'),
-        DeclareLaunchArgument('kd', default_value='1.5',
-                              description='Arm velocity (damping) gain'),
-        DeclareLaunchArgument('waist_kp', default_value='200.0',
-                              description='Waist position gain'),
-        DeclareLaunchArgument('waist_kd', default_value='2.0',
-                              description='Waist velocity (damping) gain'),
-        DeclareLaunchArgument('use_rviz', default_value='true',
-                              description='Launch RViz with MoveIt plugin'),
-        OpaqueFunction(function=_launch_setup),
-    ])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                'hand_type',
+                default_value='no_hand',
+                choices=list(_HARDWARE_CONFIG),
+                description='G1 hand configuration',
+            ),
+            DeclareLaunchArgument(
+                'network_interface',
+                description="Network interface connected to the G1 robot (e.g. 'eth0')",
+            ),
+            DeclareLaunchArgument(
+                'kp', default_value='60.0', description='Arm position gain'
+            ),
+            DeclareLaunchArgument(
+                'kd', default_value='1.5', description='Arm velocity (damping) gain'
+            ),
+            DeclareLaunchArgument(
+                'waist_kp', default_value='200.0', description='Waist position gain'
+            ),
+            DeclareLaunchArgument(
+                'waist_kd',
+                default_value='2.0',
+                description='Waist velocity (damping) gain',
+            ),
+            DeclareLaunchArgument(
+                'use_rviz',
+                default_value='true',
+                description='Launch RViz with MoveIt plugin',
+            ),
+            OpaqueFunction(function=_launch_setup),
+        ]
+    )

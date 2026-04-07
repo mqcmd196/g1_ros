@@ -2,204 +2,198 @@
 <!-- DFQ mimic joints (thumb_intermediate/distal, index/middle/ring/pinky_intermediate)
      are excluded from ros2_control — driven automatically via URDF mimic attribute. -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="g1_ros2_control" params="name initial_positions_file">
-        <xacro:property name="initial_positions" value="${load_yaml(initial_positions_file)['initial_positions']}"/>
-
-        <ros2_control name="${name}" type="system">
-            <hardware>
-                <plugin>mock_components/GenericSystem</plugin>
-            </hardware>
-
-            <!-- Left arm joints -->
-            <joint name="left_shoulder_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['left_shoulder_pitch_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="left_shoulder_roll_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['left_shoulder_roll_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="left_shoulder_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['left_shoulder_yaw_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="left_elbow_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['left_elbow_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="left_wrist_roll_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['left_wrist_roll_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="left_wrist_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['left_wrist_pitch_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="left_wrist_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['left_wrist_yaw_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-
-            <!-- Right arm joints -->
-            <joint name="right_shoulder_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['right_shoulder_pitch_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="right_shoulder_roll_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['right_shoulder_roll_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="right_shoulder_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['right_shoulder_yaw_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="right_elbow_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['right_elbow_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="right_wrist_roll_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['right_wrist_roll_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="right_wrist_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['right_wrist_pitch_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="right_wrist_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['right_wrist_yaw_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-
-            <!-- Left Inspire DFQ hand — actuated joints only (mimic joints excluded) -->
-            <joint name="L_thumb_proximal_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['L_thumb_proximal_yaw_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="L_thumb_proximal_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['L_thumb_proximal_pitch_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="L_index_proximal_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['L_index_proximal_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="L_middle_proximal_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['L_middle_proximal_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="L_ring_proximal_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['L_ring_proximal_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="L_pinky_proximal_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['L_pinky_proximal_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-
-            <!-- Right Inspire DFQ hand — actuated joints only -->
-            <joint name="R_thumb_proximal_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['R_thumb_proximal_yaw_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="R_thumb_proximal_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['R_thumb_proximal_pitch_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="R_index_proximal_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['R_index_proximal_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="R_middle_proximal_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['R_middle_proximal_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="R_ring_proximal_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['R_ring_proximal_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="R_pinky_proximal_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                    <param name="initial_value">${initial_positions['R_pinky_proximal_joint']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-
-        </ros2_control>
-    </xacro:macro>
+  <xacro:macro name="g1_ros2_control" params="name initial_positions_file">
+    <xacro:property name="initial_positions" value="${load_yaml(initial_positions_file)['initial_positions']}"/>
+    <ros2_control name="${name}" type="system">
+      <hardware>
+        <plugin>mock_components/GenericSystem</plugin>
+      </hardware>
+      <!-- Left arm joints -->
+      <joint name="left_shoulder_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['left_shoulder_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="left_shoulder_roll_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['left_shoulder_roll_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="left_shoulder_yaw_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['left_shoulder_yaw_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="left_elbow_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['left_elbow_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="left_wrist_roll_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['left_wrist_roll_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="left_wrist_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['left_wrist_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="left_wrist_yaw_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['left_wrist_yaw_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <!-- Right arm joints -->
+      <joint name="right_shoulder_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['right_shoulder_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="right_shoulder_roll_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['right_shoulder_roll_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="right_shoulder_yaw_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['right_shoulder_yaw_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="right_elbow_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['right_elbow_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="right_wrist_roll_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['right_wrist_roll_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="right_wrist_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['right_wrist_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="right_wrist_yaw_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['right_wrist_yaw_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <!-- Left Inspire DFQ hand — actuated joints only (mimic joints excluded) -->
+      <joint name="L_thumb_proximal_yaw_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['L_thumb_proximal_yaw_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="L_thumb_proximal_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['L_thumb_proximal_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="L_index_proximal_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['L_index_proximal_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="L_middle_proximal_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['L_middle_proximal_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="L_ring_proximal_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['L_ring_proximal_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="L_pinky_proximal_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['L_pinky_proximal_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <!-- Right Inspire DFQ hand — actuated joints only -->
+      <joint name="R_thumb_proximal_yaw_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['R_thumb_proximal_yaw_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="R_thumb_proximal_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['R_thumb_proximal_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="R_index_proximal_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['R_index_proximal_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="R_middle_proximal_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['R_middle_proximal_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="R_ring_proximal_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['R_ring_proximal_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="R_pinky_proximal_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['R_pinky_proximal_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+    </ros2_control>
+  </xacro:macro>
 </robot>

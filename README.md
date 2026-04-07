@@ -35,9 +35,17 @@ ros2 control set_controller_state upper_body_controller active
 
 ## Contribution
 
+### Prerequisite
+
+```shell
+sudo apt install black isort libxml2-utils
+```
+
+### Pre-commit
+
 Make sure `pre-commit` is run before commit.
 
-If you want to execute `pre-commit` automatically:
+If you want to execute `pre-commit` automatically in every `git commit` :
 
 ```shell
 cd g1_ros

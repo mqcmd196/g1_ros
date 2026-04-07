@@ -1,7 +1,6 @@
+<?xml version="1.0"?>
 <library path="g1_hardware">
-  <class name="g1_hardware/G1HardwareInterface"
-         type="g1_hardware::G1HardwareInterface"
-         base_class_type="hardware_interface::SystemInterface">
+  <class name="g1_hardware/G1HardwareInterface" type="g1_hardware::G1HardwareInterface" base_class_type="hardware_interface::SystemInterface">
     <description>
       ros2_control hardware interface for the Unitree G1 29DoF robot arm joints.
       Communicates via DDS (rt/arm_sdk LowCmd_, rt/lowstate LowState_).

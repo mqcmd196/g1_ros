@@ -6,17 +6,13 @@
   <description>Launch files to bring up the Unitree G1 robot with MoveIt2 and real hardware</description>
   <maintainer email="mqcmd196@hotmail.co.jp">Yoshiki Obinata</maintainer>
   <license>BSD-3-Clause</license>
-
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
-
   <exec_depend>g1_hardware</exec_depend>
   <exec_depend>g1_moveit_config</exec_depend>
   <exec_depend>moveit_configs_utils</exec_depend>
   <exec_depend>controller_manager</exec_depend>
-
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-
   <export>
     <build_type>ament_cmake</build_type>
   </export>
