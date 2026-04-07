@@ -1,6 +1,7 @@
 ---
-Checks: 'clang-diagnostic-*,clang-analyzer-*,-clang-diagnostic-deprecated-declarations'
+Checks: 'google-*,clang-diagnostic-*,clang-analyzer-*,readability-identifier-naming,-clang-diagnostic-deprecated-declarations'
 WarningsAsErrors: ''
+FormatStyle: google
 ExtraArgs:
   - '-std=c++17'
   - '-I/usr/include/c++/13'
@@ -10,4 +11,7 @@ ExtraArgs:
   - '-I/usr/local/include'
   - '-I/usr/include/x86_64-linux-gnu'
   - '-I/usr/include'
+CheckOptions:
+  - key:   readability-identifier-naming.FunctionCase
+    value: CamelCase
 ...

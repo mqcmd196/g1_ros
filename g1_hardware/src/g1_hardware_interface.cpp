@@ -188,8 +188,9 @@ G1HardwareInterface::on_deactivate(const rclcpp_lifecycle::State& /*previous_sta
     unitree_hg::msg::dds_::LowCmd_ cmd{};
     cmd.motor_cmd().at(kWeightJoint).q(weight_);
     for (size_t i = 0; i < info_.joints.size(); ++i) {
-      if (info_.joints[i].command_interfaces.empty())
+      if (info_.joints[i].command_interfaces.empty()) {
         continue;
+      }
       auto& mc = cmd.motor_cmd().at(sdk_indices_[i]);
       mc.q(static_cast<float>(hw_commands_[i]));
       mc.dq(0.0f);
