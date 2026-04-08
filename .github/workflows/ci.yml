@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ros-industrial/industrial_ci@master
+        env:
+          ROS_DISTRO: jazzy
+          UPSTREAM_WORKSPACE: .github/upstream.jazzy.repos
+          UPSTREAM_CMAKE_ARGS: --packages-select g1_description unitree_sdk2
+          ROSDEP_SKIP_KEYS: catkin g1_description gazebo message_generation message_runtime roscpp roslaunch rviz unitree_sdk2
