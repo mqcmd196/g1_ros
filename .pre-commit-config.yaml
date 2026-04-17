@@ -18,13 +18,7 @@ repos:
         description: Format Python code.
         language: system
         types: [python]
-        entry: black --skip-string-normalization
-      - id: ament_flake8
-        name: ament_flake8
-        description: Check Python code style using flake8.
-        language: system
-        types: [python]
-        entry: ament_flake8
+        entry: black
       - id: ament_lint_cmake
         name: ament_lint_cmake
         description: Check CMake code style using cmakelint.

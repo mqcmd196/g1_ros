@@ -35,6 +35,7 @@ if(BUILD_TESTING)
 set(ament_cmake_uncrustify_FOUND TRUE)
   set(ament_cmake_clang_format_CONFIG_FILE .clang-format)
   set(ament_cmake_clang_tidy_CONFIG_FILE .clang-tidy)
+  set(ament_cmake_flake8_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 
