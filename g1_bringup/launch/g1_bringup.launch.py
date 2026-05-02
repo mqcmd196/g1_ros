@@ -114,10 +114,6 @@ def _launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
-    # Arm controllers start inactive so no hold commands are sent at startup.
-    # Activate them explicitly before executing a MoveIt trajectory:
-    #   ros2 control set_controller_state left_arm_controller active
-    #   ros2 control set_controller_state right_arm_controller active
     _ARM_CONTROLLERS = {"upper_body_controller"}
     spawners = [
         Node(
