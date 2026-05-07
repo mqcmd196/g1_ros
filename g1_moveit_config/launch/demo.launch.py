@@ -75,6 +75,7 @@ def _launch_setup(context, *args, **kwargs):
         MoveItConfigsBuilder("g1_29dof", package_name="g1_moveit_config")
         .robot_description(file_path=f"config/{cfg['urdf_xacro']}")
         .robot_description_semantic(file_path=f"config/{cfg['srdf']}")
+        .planning_pipelines(pipelines=["ompl"], default_planning_pipeline="ompl")
         .to_moveit_configs()
     )
 
