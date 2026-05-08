@@ -20,17 +20,32 @@ colcon build --symlink-install --packages-up-to g1_bringup
 
 Please connect your computer to the robot following [official instruction](https://support.unitree.com/home/en/G1_developer/quick_development#heading-7). Please check the network interface name.
 
+If the robot has Inspire RH56DFX hands and you want to move them, run the hand service:
+```shell
+ssh unitree@192.168.123.164
+cd ~/dfx_inspire_service/build
+sudo ./inspire_g1
+```
+
 Then launch the nodes.
 
 ```shell
 source <colcon workspace>/install/setup.bash
 ros2 launch g1_bringup g1_bringup.launch.py network_interface:=<network interface name>
+# If you want to move hands, run the following instead:
+# ros2 launch g1_bringup g1_bringup.launch.py network_interface:=<network interface name> hand_type:=inspire_dfq
 ```
 
 To activate ROS controller
 
 ```shell
 ros2 control set_controller_state upper_body_controller active
+```
+
+To run hand motion demo
+
+```shell
+ros2 run g1_bringup inspire_dfx_hand_open_close_demo --ros-args -p hand:=both
 ```
 
 ## Contribution
