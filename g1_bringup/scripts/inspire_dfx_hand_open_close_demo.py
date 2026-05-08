@@ -39,6 +39,7 @@ LEFT_JOINTS = [
 
 OPEN_POSITIONS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 CLOSED_POSITIONS = [0.3, 0.6, 1.7, 1.7, 1.7, 1.7]
+# CLOSED_POSITIONS = [1.3, 0.6, 1.7, 1.7, 1.7, 1.7]  # Index finger interferes with thumb
 
 
 def validate_positive(name: str, value: float) -> float:
