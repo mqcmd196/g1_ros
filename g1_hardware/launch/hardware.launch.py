@@ -55,6 +55,10 @@ _HARDWARE_CONFIG = {
         "urdf_xacro": "g1_no_hand_real.urdf.xacro",
         "ros2_controllers": "ros2_controllers_no_hand.yaml",
     },
+    "inspire_dfq": {
+        "urdf_xacro": "g1_inspire_dfq_real.urdf.xacro",
+        "ros2_controllers": "ros2_controllers_inspire_dfq.yaml",
+    },
 }
 
 
@@ -74,6 +78,9 @@ def _launch_setup(context, *args, **kwargs):
     kd = LaunchConfiguration("kd").perform(context)
     waist_kp = LaunchConfiguration("waist_kp").perform(context)
     waist_kd = LaunchConfiguration("waist_kd").perform(context)
+    inspire_command_topic = LaunchConfiguration("inspire_command_topic").perform(context)
+    inspire_state_topic = LaunchConfiguration("inspire_state_topic").perform(context)
+    inspire_state_timeout_sec = LaunchConfiguration("inspire_state_timeout_sec").perform(context)
 
     g1_hw_share = Path(get_package_share_directory("g1_hardware"))
 
@@ -86,6 +93,9 @@ def _launch_setup(context, *args, **kwargs):
             "kd": kd,
             "waist_kp": waist_kp,
             "waist_kd": waist_kd,
+            "inspire_command_topic": inspire_command_topic,
+            "inspire_state_topic": inspire_state_topic,
+            "inspire_state_timeout_sec": inspire_state_timeout_sec,
         },
     ).toxml()
 
@@ -134,6 +144,21 @@ def generate_launch_description():
                 "waist_kd",
                 default_value="2.0",
                 description="Waist velocity (damping) gain",
+            ),
+            DeclareLaunchArgument(
+                "inspire_command_topic",
+                default_value="rt/inspire/cmd",
+                description="DDS topic for RH56DFX commands",
+            ),
+            DeclareLaunchArgument(
+                "inspire_state_topic",
+                default_value="rt/inspire/state",
+                description="DDS topic for RH56DFX state",
+            ),
+            DeclareLaunchArgument(
+                "inspire_state_timeout_sec",
+                default_value="3.0",
+                description="Seconds to wait for the first RH56DFX state message",
             ),
             OpaqueFunction(function=_launch_setup),
         ]

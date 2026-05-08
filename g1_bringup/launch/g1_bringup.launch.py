@@ -65,6 +65,16 @@ _HARDWARE_CONFIG = {
             "upper_body_controller",
         ],
     },
+    "inspire_dfq": {
+        "urdf_xacro": "g1_inspire_dfq_real.urdf.xacro",
+        "srdf": "g1_inspire_dfq.srdf",
+        "controllers": [
+            "joint_state_broadcaster",
+            "upper_body_controller",
+            "right_gripper_controller",
+            "left_gripper_controller",
+        ],
+    },
 }
 
 
@@ -75,6 +85,9 @@ def _launch_setup(context, *args, **kwargs):
     kd = LaunchConfiguration("kd").perform(context)
     waist_kp = LaunchConfiguration("waist_kp").perform(context)
     waist_kd = LaunchConfiguration("waist_kd").perform(context)
+    inspire_command_topic = LaunchConfiguration("inspire_command_topic").perform(context)
+    inspire_state_topic = LaunchConfiguration("inspire_state_topic").perform(context)
+    inspire_state_timeout_sec = LaunchConfiguration("inspire_state_timeout_sec").perform(context)
     use_rviz = LaunchConfiguration("use_rviz").perform(context).lower()
 
     cfg = _HARDWARE_CONFIG[hand_type]
@@ -93,6 +106,9 @@ def _launch_setup(context, *args, **kwargs):
                 "kd": kd,
                 "waist_kp": waist_kp,
                 "waist_kd": waist_kd,
+                "inspire_command_topic": inspire_command_topic,
+                "inspire_state_topic": inspire_state_topic,
+                "inspire_state_timeout_sec": inspire_state_timeout_sec,
             },
         )
         .robot_description_semantic(
@@ -115,6 +131,9 @@ def _launch_setup(context, *args, **kwargs):
             "kd": kd,
             "waist_kp": waist_kp,
             "waist_kd": waist_kd,
+            "inspire_command_topic": inspire_command_topic,
+            "inspire_state_topic": inspire_state_topic,
+            "inspire_state_timeout_sec": inspire_state_timeout_sec,
         }.items(),
     )
 
@@ -167,6 +186,21 @@ def generate_launch_description():
                 "waist_kd",
                 default_value="2.0",
                 description="Waist velocity (damping) gain",
+            ),
+            DeclareLaunchArgument(
+                "inspire_command_topic",
+                default_value="rt/inspire/cmd",
+                description="DDS topic for RH56DFX commands",
+            ),
+            DeclareLaunchArgument(
+                "inspire_state_topic",
+                default_value="rt/inspire/state",
+                description="DDS topic for RH56DFX state",
+            ),
+            DeclareLaunchArgument(
+                "inspire_state_timeout_sec",
+                default_value="3.0",
+                description="Seconds to wait for the first RH56DFX state message",
             ),
             DeclareLaunchArgument(
                 "use_rviz",

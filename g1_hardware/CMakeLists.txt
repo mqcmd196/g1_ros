@@ -15,6 +15,7 @@ find_package(unitree_sdk2 REQUIRED)
 
 ament_auto_add_library(${PROJECT_NAME} SHARED
   src/g1_hardware_interface.cpp
+  src/inspire_rh56dfx_hardware_interface.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
