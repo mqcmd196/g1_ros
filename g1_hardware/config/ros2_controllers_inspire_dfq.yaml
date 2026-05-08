@@ -5,10 +5,10 @@ controller_manager:
     upper_body_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-    right_gripper_controller:
+    right_hand_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-    left_gripper_controller:
+    left_hand_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
     joint_state_broadcaster:
@@ -41,7 +41,7 @@ upper_body_controller:
       - velocity
 
 # DFQ actuated joints only (mimic: intermediate/distal joints excluded)
-right_gripper_controller:
+right_hand_controller:
   ros__parameters:
     joints:
       - R_thumb_proximal_yaw_joint
@@ -56,7 +56,7 @@ right_gripper_controller:
       - position
       - velocity
 
-left_gripper_controller:
+left_hand_controller:
   ros__parameters:
     joints:
       - L_thumb_proximal_yaw_joint

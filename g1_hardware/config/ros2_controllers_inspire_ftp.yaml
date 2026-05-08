@@ -8,10 +8,10 @@ controller_manager:
     left_arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-    right_gripper_controller:
+    right_hand_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-    left_gripper_controller:
+    left_hand_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
     joint_state_broadcaster:
@@ -50,7 +50,7 @@ left_arm_controller:
       - velocity
 
 # FTP actuated joints only (mimic: thumb_3/4, index_2, middle_2, ring_2, little_2 excluded)
-right_gripper_controller:
+right_hand_controller:
   ros__parameters:
     joints:
       - right_thumb_1_joint
@@ -65,7 +65,7 @@ right_gripper_controller:
       - position
       - velocity
 
-left_gripper_controller:
+left_hand_controller:
   ros__parameters:
     joints:
       - left_thumb_1_joint

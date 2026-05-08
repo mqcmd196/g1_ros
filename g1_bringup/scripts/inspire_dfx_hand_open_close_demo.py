@@ -51,10 +51,10 @@ class InspireDFXHandOpenCloseDemo(Node):
 
         self.declare_parameter("hand", "both")
         self.declare_parameter(
-            "right_action_name", "/right_gripper_controller/follow_joint_trajectory"
+            "right_action_name", "/right_hand_controller/follow_joint_trajectory"
         )
         self.declare_parameter(
-            "left_action_name", "/left_gripper_controller/follow_joint_trajectory"
+            "left_action_name", "/left_hand_controller/follow_joint_trajectory"
         )
         self.declare_parameter("period_sec", 1.0)
         self.declare_parameter("move_duration_sec", 0.5)
@@ -110,7 +110,7 @@ class InspireDFXHandOpenCloseDemo(Node):
         for side, client in self.action_clients.items():
             if not client.wait_for_server(timeout_sec=self.server_timeout_sec):
                 raise RuntimeError(
-                    f"{side} gripper action server is not available: {self.action_names[side]}"
+                    f"{side} hand action server is not available: {self.action_names[side]}"
                 )
 
     def timer_callback(self) -> None:

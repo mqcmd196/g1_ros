@@ -49,7 +49,7 @@
         <joint name="right_wrist_yaw_joint"/>
     </group>
 
-    <group name="right_gripper">
+    <group name="right_hand">
         <joint name="R_thumb_proximal_yaw_joint"/>
         <joint name="R_thumb_proximal_pitch_joint"/>
         <joint name="R_index_proximal_joint"/>
@@ -58,7 +58,7 @@
         <joint name="R_pinky_proximal_joint"/>
     </group>
 
-    <group name="left_gripper">
+    <group name="left_hand">
         <joint name="L_thumb_proximal_yaw_joint"/>
         <joint name="L_thumb_proximal_pitch_joint"/>
         <joint name="L_index_proximal_joint"/>
@@ -87,8 +87,8 @@
         <joint name="left_wrist_yaw_joint" value="0"/>
     </group_state>
 
-    <end_effector name="right_hand" parent_link="right_wrist_yaw_link" group="right_gripper" parent_group="right_arm"/>
-    <end_effector name="left_hand" parent_link="left_wrist_yaw_link" group="left_gripper" parent_group="left_arm"/>
+    <end_effector name="right_hand_end_effector" parent_link="right_wrist_yaw_link" group="right_hand" parent_group="right_arm"/>
+    <end_effector name="left_hand_end_effector" parent_link="left_wrist_yaw_link" group="left_hand" parent_group="left_arm"/>
 
     <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="pelvis"/>
 

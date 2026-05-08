@@ -71,8 +71,8 @@ _HARDWARE_CONFIG = {
         "controllers": [
             "joint_state_broadcaster",
             "upper_body_controller",
-            "right_gripper_controller",
-            "left_gripper_controller",
+            "right_hand_controller",
+            "left_hand_controller",
         ],
     },
 }
