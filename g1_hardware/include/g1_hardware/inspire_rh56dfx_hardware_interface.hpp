@@ -90,8 +90,7 @@ private:
   int active_command_interfaces_{0};
 
   unitree::robot::ChannelPublisherPtr<unitree_go::msg::dds_::MotorCmds_> hand_command_publisher_;
-  unitree::robot::ChannelSubscriberPtr<unitree_go::msg::dds_::MotorStates_>
-      hand_state_subscriber_;
+  unitree::robot::ChannelSubscriberPtr<unitree_go::msg::dds_::MotorStates_> hand_state_subscriber_;
   unitree_go::msg::dds_::MotorCmds_ command_msg_;
   unitree_go::msg::dds_::MotorStates_ state_msg_;
   std::mutex state_mutex_;

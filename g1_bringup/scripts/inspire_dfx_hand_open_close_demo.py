@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Periodically open/close Inspire RH56DFX hands via FollowJointTrajectory.
+"""
+Periodically open/close Inspire RH56DFX hands via FollowJointTrajectory.
 
-Examples:
+Examples
+--------
   ros2 run g1_bringup inspire_dfx_hand_open_close_demo --ros-args -p hand:=both
   ros2 run g1_bringup inspire_dfx_hand_open_close_demo --ros-args -p hand:=right
   ros2 run g1_bringup inspire_dfx_hand_open_close_demo --ros-args -p hand:=left -p period_sec:=2.0
+
 """
 
 import math
 from typing import Dict, Iterable, List
 
-import rclpy
 from control_msgs.action import FollowJointTrajectory
+import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-
 
 RIGHT_JOINTS = [
     "R_thumb_proximal_yaw_joint",

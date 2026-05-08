@@ -193,10 +193,9 @@ InspireRH56DFXHardwareInterface::on_activate(const rclcpp_lifecycle::State& /*pr
       },
       1);
 
-  const auto deadline =
-      std::chrono::steady_clock::now() +
-      std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-          std::chrono::duration<double>(state_timeout_sec_));
+  const auto deadline = std::chrono::steady_clock::now() +
+                        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                            std::chrono::duration<double>(state_timeout_sec_));
   while (!state_received_ && std::chrono::steady_clock::now() < deadline) {
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
   }
@@ -227,8 +226,8 @@ InspireRH56DFXHardwareInterface::on_activate(const rclcpp_lifecycle::State& /*pr
 
   if (received_motor_count < kMotorCount) {
     RCLCPP_FATAL(rclcpp::get_logger("InspireRH56DFXHardwareInterface"),
-                 "Hand state on '%s' has %zu motors, expected at least %zu.",
-                 state_topic_.c_str(), received_motor_count, kMotorCount);
+                 "Hand state on '%s' has %zu motors, expected at least %zu.", state_topic_.c_str(),
+                 received_motor_count, kMotorCount);
     hand_command_publisher_.reset();
     hand_state_subscriber_.reset();
     return CallbackReturn::ERROR;
@@ -249,8 +248,7 @@ InspireRH56DFXHardwareInterface::on_deactivate(const rclcpp_lifecycle::State& /*
   return CallbackReturn::SUCCESS;
 }
 
-hardware_interface::return_type
-InspireRH56DFXHardwareInterface::perform_command_mode_switch(
+hardware_interface::return_type InspireRH56DFXHardwareInterface::perform_command_mode_switch(
     const std::vector<std::string>& start_interfaces,
     const std::vector<std::string>& stop_interfaces)
 {
@@ -278,8 +276,8 @@ InspireRH56DFXHardwareInterface::perform_command_mode_switch(
   return hardware_interface::return_type::OK;
 }
 
-hardware_interface::return_type InspireRH56DFXHardwareInterface::read(const rclcpp::Time& /*time*/,
-                                                                      const rclcpp::Duration& period)
+hardware_interface::return_type
+InspireRH56DFXHardwareInterface::read(const rclcpp::Time& /*time*/, const rclcpp::Duration& period)
 {
   if (!state_received_) {
     return hardware_interface::return_type::OK;
@@ -321,8 +319,9 @@ InspireRH56DFXHardwareInterface::write(const rclcpp::Time& /*time*/,
   command_msg_.cmds().resize(kMotorCount);
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     const auto& cfg = joint_configs_[i];
-    command_msg_.cmds().at(cfg.motor_index).q(
-        static_cast<float>(joint_position_to_open_fraction(hw_commands_[i], cfg)));
+    command_msg_.cmds()
+        .at(cfg.motor_index)
+        .q(static_cast<float>(joint_position_to_open_fraction(hw_commands_[i], cfg)));
   }
 
   hand_command_publisher_->Write(command_msg_);

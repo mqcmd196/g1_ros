@@ -78,9 +78,13 @@ def _launch_setup(context, *args, **kwargs):
     kd = LaunchConfiguration("kd").perform(context)
     waist_kp = LaunchConfiguration("waist_kp").perform(context)
     waist_kd = LaunchConfiguration("waist_kd").perform(context)
-    inspire_command_topic = LaunchConfiguration("inspire_command_topic").perform(context)
+    inspire_command_topic = LaunchConfiguration("inspire_command_topic").perform(
+        context
+    )
     inspire_state_topic = LaunchConfiguration("inspire_state_topic").perform(context)
-    inspire_state_timeout_sec = LaunchConfiguration("inspire_state_timeout_sec").perform(context)
+    inspire_state_timeout_sec = LaunchConfiguration(
+        "inspire_state_timeout_sec"
+    ).perform(context)
 
     g1_hw_share = Path(get_package_share_directory("g1_hardware"))
 

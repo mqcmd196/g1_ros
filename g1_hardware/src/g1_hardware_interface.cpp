@@ -247,8 +247,8 @@ G1HardwareInterface::perform_command_mode_switch(const std::vector<std::string>&
   active_command_interfaces_ = std::max(0, active_command_interfaces_);
 
   RCLCPP_INFO(rclcpp::get_logger("G1HardwareInterface"),
-              "Command mode switch: %d started, %d stopped -> %d active. Weight will %s.",
-              started, stopped, active_command_interfaces_,
+              "Command mode switch: %d started, %d stopped -> %d active. Weight will %s.", started,
+              stopped, active_command_interfaces_,
               active_command_interfaces_ > 0 ? "ramp UP" : "ramp DOWN");
 
   return hardware_interface::return_type::OK;
