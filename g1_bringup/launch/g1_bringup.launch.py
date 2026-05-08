@@ -98,6 +98,10 @@ def _launch_setup(context, *args, **kwargs):
         .robot_description_semantic(
             file_path=str(g1_moveit_share / f"config/{cfg['srdf']}"),
         )
+        .planning_pipelines(
+            pipelines=["ompl"],
+            default_planning_pipeline="ompl",
+        )
         .to_moveit_configs()
     )
 
