@@ -22,7 +22,7 @@ Please connect your computer to the robot following [official instruction](https
 
 If the robot has Inspire RH56DFX hands and you want to move them, run the hand service:
 ```shell
-ssh unitree@192.168.123.164
+ssh unitree@192.168.123.164  # Information required for ssh (IP address, user name, password): https://support.unitree.com/home/en/G1_developer/about_G1#heading-6
 cd ~/dfx_inspire_service/build
 sudo ./inspire_g1
 ```
