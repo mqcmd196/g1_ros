@@ -65,7 +65,7 @@ const std::unordered_map<std::string, JointConfig> kJointNameToConfig = {
     {"L_thumb_proximal_yaw_joint", {11, 0.0, 1.3}},
 };
 
-double clamp01(double value)
+double Clamp01(double value)
 {
   if (!std::isfinite(value)) {
     return 0.0;
@@ -73,17 +73,17 @@ double clamp01(double value)
   return std::min(1.0, std::max(0.0, value));
 }
 
-double open_fraction_to_joint_position(double open_fraction, const JointConfig& cfg)
+double OpenFractionToJointPosition(double open_fraction, const JointConfig& cfg)
 {
-  const double normalized_closed = 1.0 - clamp01(open_fraction);
+  const double normalized_closed = 1.0 - Clamp01(open_fraction);
   return cfg.open_position + normalized_closed * (cfg.closed_position - cfg.open_position);
 }
 
-double joint_position_to_open_fraction(double position, const JointConfig& cfg)
+double JointPositionToOpenFraction(double position, const JointConfig& cfg)
 {
   const double normalized_closed =
       (position - cfg.open_position) / (cfg.closed_position - cfg.open_position);
-  return 1.0 - clamp01(normalized_closed);
+  return 1.0 - Clamp01(normalized_closed);
 }
 
 } // namespace
@@ -217,7 +217,7 @@ InspireRH56DFXHardwareInterface::on_activate(const rclcpp_lifecycle::State& /*pr
       for (size_t i = 0; i < info_.joints.size(); ++i) {
         const auto& cfg = joint_configs_[i];
         const double open_fraction = state_msg_.states().at(cfg.motor_index).q();
-        hw_positions_[i] = open_fraction_to_joint_position(open_fraction, cfg);
+        hw_positions_[i] = OpenFractionToJointPosition(open_fraction, cfg);
         hw_velocities_[i] = 0.0;
         hw_commands_[i] = hw_positions_[i];
       }
@@ -301,7 +301,7 @@ InspireRH56DFXHardwareInterface::read(const rclcpp::Time& /*time*/, const rclcpp
     const double previous_position = hw_positions_[i];
     const auto& cfg = joint_configs_[i];
     const double open_fraction = state.states().at(cfg.motor_index).q();
-    hw_positions_[i] = open_fraction_to_joint_position(open_fraction, cfg);
+    hw_positions_[i] = OpenFractionToJointPosition(open_fraction, cfg);
     hw_velocities_[i] = dt > 1e-9 ? (hw_positions_[i] - previous_position) / dt : 0.0;
   }
 
@@ -321,7 +321,7 @@ InspireRH56DFXHardwareInterface::write(const rclcpp::Time& /*time*/,
     const auto& cfg = joint_configs_[i];
     command_msg_.cmds()
         .at(cfg.motor_index)
-        .q(static_cast<float>(joint_position_to_open_fraction(hw_commands_[i], cfg)));
+        .q(static_cast<float>(JointPositionToOpenFraction(hw_commands_[i], cfg)));
   }
 
   hand_command_publisher_->Write(command_msg_);
