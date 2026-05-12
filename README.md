@@ -24,7 +24,7 @@ If the robot has Inspire RH56DFX hands and you want to move them, run the hand s
 ```shell
 ssh unitree@192.168.123.164  # Information required for ssh (IP address, user name, password): https://support.unitree.com/home/en/G1_developer/about_G1#heading-6
 cd ~/dfx_inspire_service/build
-sudo ./inspire_g1
+sudo ./inspire_g1 -k -u  # Required branch: https://github.com/pazeshun/dfx_inspire_service/tree/pazeshun-devel (https://github.com/unitreerobotics/dfx_inspire_service/pull/4 + https://github.com/unitreerobotics/dfx_inspire_service/pull/5)
 ```
 
 Then launch the nodes.
