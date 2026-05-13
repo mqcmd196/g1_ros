@@ -33,3 +33,4 @@ upper_body_controller:
     state_interfaces:
       - position
       - velocity
+    interpolate_from_desired_state: true
