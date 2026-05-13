@@ -228,13 +228,27 @@ hardware_interface::return_type
 G1HardwareInterface::perform_command_mode_switch(const std::vector<std::string>& start_interfaces,
                                                  const std::vector<std::string>& stop_interfaces)
 {
-  active_command_interfaces_ += static_cast<int>(start_interfaces.size());
-  active_command_interfaces_ -= static_cast<int>(stop_interfaces.size());
+  auto is_own_command_interface = [this](const std::string& interface_name) {
+    const auto separator = interface_name.find('/');
+    const std::string joint_name =
+        separator == std::string::npos ? interface_name : interface_name.substr(0, separator);
+    return std::any_of(info_.joints.begin(), info_.joints.end(), [&joint_name](const auto& joint) {
+      return joint.name == joint_name && !joint.command_interfaces.empty();
+    });
+  };
+
+  const auto started = static_cast<int>(
+      std::count_if(start_interfaces.begin(), start_interfaces.end(), is_own_command_interface));
+  const auto stopped = static_cast<int>(
+      std::count_if(stop_interfaces.begin(), stop_interfaces.end(), is_own_command_interface));
+
+  active_command_interfaces_ += started;
+  active_command_interfaces_ -= stopped;
   active_command_interfaces_ = std::max(0, active_command_interfaces_);
 
   RCLCPP_INFO(rclcpp::get_logger("G1HardwareInterface"),
-              "Command mode switch: %zu started, %zu stopped → %d active. Weight will %s.",
-              start_interfaces.size(), stop_interfaces.size(), active_command_interfaces_,
+              "Command mode switch: %d started, %d stopped -> %d active. Weight will %s.", started,
+              stopped, active_command_interfaces_,
               active_command_interfaces_ > 0 ? "ramp UP" : "ramp DOWN");
 
   return hardware_interface::return_type::OK;

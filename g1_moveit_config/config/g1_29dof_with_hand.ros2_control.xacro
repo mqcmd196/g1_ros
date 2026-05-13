@@ -107,7 +107,7 @@
         </state_interface>
         <state_interface name="velocity"/>
       </joint>
-      <!-- Left gripper joints -->
+      <!-- Left hand joints -->
       <joint name="left_hand_thumb_0_joint">
         <command_interface name="position"/>
         <state_interface name="position">
@@ -157,7 +157,7 @@
         </state_interface>
         <state_interface name="velocity"/>
       </joint>
-      <!-- Right gripper joints -->
+      <!-- Right hand joints -->
       <joint name="right_hand_thumb_0_joint">
         <command_interface name="position"/>
         <state_interface name="position">

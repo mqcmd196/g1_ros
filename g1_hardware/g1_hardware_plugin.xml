@@ -6,4 +6,10 @@
       Communicates via DDS (rt/arm_sdk LowCmd_, rt/lowstate LowState_).
     </description>
   </class>
+  <class name="g1_hardware/InspireRH56DFXHardwareInterface" type="g1_hardware::InspireRH56DFXHardwareInterface" base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ros2_control hardware interface for Inspire Robots RH56DFX hands.
+      Communicates with inspire_g1 via DDS (rt/inspire/cmd MotorCmds_, rt/inspire/state MotorStates_).
+    </description>
+  </class>
 </library>
