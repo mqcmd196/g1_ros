@@ -39,6 +39,7 @@ upper_body_controller:
     state_interfaces:
       - position
       - velocity
+    interpolate_from_desired_state: true
 
 # DFQ actuated joints only (mimic: intermediate/distal joints excluded)
 right_hand_controller:
@@ -55,6 +56,7 @@ right_hand_controller:
     state_interfaces:
       - position
       - velocity
+    interpolate_from_desired_state: true  # This reduces the problems caused by https://github.com/mqcmd196/g1_ros/issues/7. Once this issue is fixed, check if this line can be removed
 
 left_hand_controller:
   ros__parameters:
@@ -70,3 +72,4 @@ left_hand_controller:
     state_interfaces:
       - position
       - velocity
+    interpolate_from_desired_state: true  # This reduces the problems caused by https://github.com/mqcmd196/g1_ros/issues/7. Once this issue is fixed, check if this line can be removed
