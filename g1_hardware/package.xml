@@ -10,6 +10,7 @@
   <depend>hardware_interface</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>unitree_sdk2</depend>
   <exec_depend>g1_description</exec_depend>

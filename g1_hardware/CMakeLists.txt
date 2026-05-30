@@ -26,6 +26,15 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE "PLUGINLIB_BUILDING_LIBRARY")
 
 pluginlib_export_plugin_description_file(hardware_interface g1_hardware_plugin.xml)
 
+ament_auto_add_library(loco_cmd_adapter SHARED
+  src/loco_cmd_adapter.cpp
+)
+
+rclcpp_components_register_node(loco_cmd_adapter
+  PLUGIN "loco_cmd_adapter::LocoCmdAdapterNode"
+  EXECUTABLE loco_cmd_adapter_node
+)
+
 install(FILES g1_hardware_plugin.xml
   DESTINATION share/${PROJECT_NAME})
 
