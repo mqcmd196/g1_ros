@@ -32,6 +32,7 @@ G1 real-hardware ROS2 driver launch.
 Starts:
   - robot_state_publisher  (URDF with g1_hardware plugin)
   - ros2_control_node      (talks to robot via DDS)
+  - loco_cmd_adapter       (accepting locomotion mode, cmd_vel)
 
 Controller spawning is intentionally left to the bringup layer
 so that this launch can be reused regardless of which controllers
@@ -47,7 +48,8 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer, Node
+from launch_ros.descriptions import ComposableNode
 import xacro
 
 _HARDWARE_CONFIG = {
@@ -107,16 +109,31 @@ def _launch_setup(context, *args, **kwargs):
 
     return [
         Node(
-            package="robot_state_publisher",
-            executable="robot_state_publisher",
-            parameters=[{"robot_description": robot_description}],
-        ),
-        Node(
             package="controller_manager",
             executable="ros2_control_node",
             parameters=[
                 {"robot_description": robot_description},
                 controllers_yaml,
+            ],
+        ),
+        ComposableNodeContainer(
+            name="g1_hardware_container",
+            namespace="",
+            package="rclcpp_components",
+            executable="component_container",
+            composable_node_descriptions=[
+                ComposableNode(
+                    package="robot_state_publisher",
+                    plugin="robot_state_publisher::RobotStatePublisher",
+                    name="robot_state_publisher",
+                    parameters=[{"robot_description": robot_description}],
+                ),
+                ComposableNode(
+                    package="g1_hardware",
+                    plugin="loco_cmd_adapter::LocoCmdAdapterNode",
+                    name="loco_cmd_adapter",
+                    parameters=[{"network_interface": network_interface}],
+                ),
             ],
         ),
     ]
