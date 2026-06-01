@@ -1,5 +1,8 @@
 ---
-Checks: 'google-*,clang-diagnostic-*,clang-analyzer-*,readability-identifier-naming,-clang-diagnostic-deprecated-declarations'
+# google-build-using-namespace is suppressed because rclcpp_components_register_node
+# auto-generates node_main_*.cpp containing "using namespace rclcpp::executors;" which
+# cannot be annotated with NOLINT.
+Checks: 'google-*,clang-diagnostic-*,clang-analyzer-*,readability-identifier-naming,-clang-diagnostic-deprecated-declarations,-google-build-using-namespace'
 WarningsAsErrors: ''
 FormatStyle: google
 ExtraArgs:
