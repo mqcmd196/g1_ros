@@ -30,6 +30,7 @@
 
 #include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <unitree/robot/g1/loco/g1_loco_api.hpp>
 #include <unitree/robot/g1/loco/g1_loco_client.hpp>
 
@@ -42,8 +43,19 @@ public:
 
 private:
   std::string network_interface_;
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   std::unique_ptr<unitree::robot::g1::LocoClient> loco_client_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr zero_torque_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr damp_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr start_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr squat_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr sit_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr stand_up_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr control_waist_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr stop_move_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr high_stand_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr low_stand_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr balance_stand_srv_;
 };
 
 } // namespace loco_cmd_adapter
