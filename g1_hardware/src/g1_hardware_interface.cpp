@@ -167,6 +167,9 @@ G1HardwareInterface::on_activate(const rclcpp_lifecycle::State& /*previous_state
   deactivating_ = false;
   active_command_interfaces_ = 0;
 
+  loco_client_ = std::make_unique<unitree::robot::g1::LocoClient>();
+  loco_client_->Init();
+
   RCLCPP_INFO(rclcpp::get_logger("G1HardwareInterface"),
               "Activated. Weight will ramp up to 1.0 over %.1f s.", 1.0f / weight_rate_);
   return CallbackReturn::SUCCESS;
@@ -206,6 +209,7 @@ G1HardwareInterface::on_deactivate(const rclcpp_lifecycle::State& /*previous_sta
 
   arm_sdk_publisher_.reset();
   low_state_subscriber_.reset();
+  loco_client_.reset();
   RCLCPP_INFO(rclcpp::get_logger("G1HardwareInterface"), "Deactivated.");
   return CallbackReturn::SUCCESS;
 }
@@ -228,6 +232,23 @@ hardware_interface::return_type
 G1HardwareInterface::perform_command_mode_switch(const std::vector<std::string>& start_interfaces,
                                                  const std::vector<std::string>& stop_interfaces)
 {
+  // Check loco mode only when starting interfaces (not stopping-only switches)
+  if (!start_interfaces.empty()) {
+    int fsm_id_;
+    loco_client_->GetFsmId(fsm_id_);
+    if (fsm_id_ != 500    // Walk mode in the tablet
+        && fsm_id_ != 501 // Walk (Control waist) mode in the tablet
+    )
+    {
+      RCLCPP_FATAL(
+          rclcpp::get_logger("G1HardwareInterface"),
+          "Robot is in FSM mode %d, but 500 (start) or 501 (control_waist) mode is "
+          "required. Please switch the robot to stand_up mode before activating the controller.",
+          fsm_id_);
+      return hardware_interface::return_type::ERROR;
+    }
+  }
+
   auto is_own_command_interface = [this](const std::string& interface_name) {
     const auto separator = interface_name.find('/');
     const std::string joint_name =
