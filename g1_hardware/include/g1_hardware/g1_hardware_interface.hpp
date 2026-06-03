@@ -39,6 +39,7 @@
 #include <unitree/idl/hg/LowState_.hpp>
 #include <unitree/robot/channel/channel_publisher.hpp>
 #include <unitree/robot/channel/channel_subscriber.hpp>
+#include <unitree/robot/g1/loco/g1_loco_client.hpp>
 #include <unordered_map>
 #include <vector>
 
@@ -165,6 +166,7 @@ private:
   // DDS
   unitree::robot::ChannelPublisherPtr<unitree_hg::msg::dds_::LowCmd_> arm_sdk_publisher_;
   unitree::robot::ChannelSubscriberPtr<unitree_hg::msg::dds_::LowState_> low_state_subscriber_;
+  std::unique_ptr<unitree::robot::g1::LocoClient> loco_client_;
   unitree_hg::msg::dds_::LowState_ state_msg_;
   std::mutex state_mutex_;
   bool state_received_{false};
