@@ -52,6 +52,11 @@ rclcpp_components_register_node(loco_cmd_adapter
 install(FILES g1_hardware_plugin.xml
   DESTINATION share/${PROJECT_NAME})
 
+install(
+  PROGRAMS scripts/example_sonic_pose.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_cppcheck_FOUND TRUE)
