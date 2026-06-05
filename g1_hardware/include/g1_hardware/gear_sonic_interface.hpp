@@ -60,11 +60,16 @@ namespace g1_hardware
  *       false → stop sending planner messages only (no stop=1 command).
  *               Deploy reverts to IDLE after its 1-second planner timeout; robot stays balanced.
  *
- *   ~/mode/<name>     (std_srvs/Trigger) — switch locomotion mode instantly
- *       idle, slow_walk, walk, run, idle_squat, idle_kneel_two_legs,
- *       idle_kneel, idle_lying_face_down, crawling, idle_boxing,
- *       walk_boxing, left_punch, right_punch, random_punch,
- *       elbow_crawling, left_hook, right_hook, forward_jump,
+ *   ~/mode/default    (std_srvs/Trigger) — auto-select gait from cmd_vel magnitude (default)
+ *       mag < 0.05       → IDLE
+ *       0.05 ≤ mag < 0.6 → SLOW_WALK
+ *       0.6  ≤ mag < 1.5 → WALK  (speed auto)
+ *       mag ≥ 1.5        → RUN
+ *
+ *   ~/mode/<name>     (std_srvs/Trigger) — fix a specific locomotion mode
+ *       idle_squat, idle_kneel_two_legs, idle_kneel, idle_lying_face_down,
+ *       crawling, idle_boxing, walk_boxing, left_punch, right_punch,
+ *       random_punch, elbow_crawling, left_hook, right_hook, forward_jump,
  *       stealth_walk, injured_walk
  *
  * ── Topics ────────────────────────────────────────────────────────────────
@@ -91,8 +96,9 @@ namespace g1_hardware
  *    "The sender has already applied offsets and root normalization").
  *
  * ── Parameters ────────────────────────────────────────────────────────────
- *   zmq_port      (int,    default 5556)
- *   publish_rate  (double, default 50.0 Hz)
+ *   zmq_port        (int,    default 5556)
+ *   publish_rate    (double, default 50.0 Hz)
+ *   cmd_vel_timeout (double, default 0.5 s) — cmd_vel zeroed if no message within this window
  *
  * Deploy stack launch (on robot):
  *   ./deploy.sh --input-type zmq_manager --zmq-host <IP of this machine> real
@@ -135,12 +141,14 @@ private:
   std::mutex data_mutex_;
 
   // Locomotion state
-  int locomotion_mode_{0};        // LocomotionMode enum value (0 = IDLE)
+  int locomotion_mode_{-1};       // -1 = auto (IDLE/SLOW_WALK/WALK/RUN from cmd_vel mag)
   double cmd_vel_x_{0.0};         // forward speed  (body frame, m/s)
   double cmd_vel_y_{0.0};         // strafe speed   (body frame, m/s, positive = left)
   double cmd_angular_z_{0.0};     // turn rate      (rad/s); integrated each timer tick
   double heading_rad_{0.0};       // accumulated heading angle (rad)
   double publish_dt_{1.0 / 50.0}; // updated in constructor from publish_rate param
+  rclcpp::Time last_cmd_vel_time_{0, 0, RCL_ROS_TIME}; // last cmd_vel receive time
+  double cmd_vel_timeout_{0.5}; // seconds; cmd_vel zeroed if no message within this window
 
   // VR 3-point upper-body targets
   // vr_position: [Lw_x,y,z, Rw_x,y,z, H_x,y,z]  (pelvis frame)
