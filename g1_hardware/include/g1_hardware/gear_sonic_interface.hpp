@@ -102,7 +102,8 @@ namespace g1_hardware
  *   publish_rate    (double, default 50.0 Hz)
  *   cmd_vel_timeout (double, default 0.5 s) — cmd_vel zeroed if no message within this window
  *
- * Deploy stack launch (on robot):
+ * gear_sonic launch (on robot):
+ *   Execute gear_sonic's ./deploy.sh and ensure the ZMQ connection is available:
  *   ./deploy.sh --input-type zmq_manager --zmq-host <IP of this machine> real
  */
 class GearSonicInterface : public rclcpp::Node
@@ -173,7 +174,10 @@ private:
   bool control_active_{false};
 
   zmq::context_t zmq_ctx_;
+  // XPUB (extended PUB) instead of plain PUB: notifies us when a subscriber
+  // connects (0x01 prefix) or disconnects (0x00 prefix), enabling connection monitoring.
   std::unique_ptr<zmq::socket_t> zmq_sock_;
+  bool deploy_connected_{false}; // true once the deploy stack SUB connects
 
   static constexpr int kZmqHeaderSize = 1280;
 };

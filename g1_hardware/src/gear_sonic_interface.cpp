@@ -67,11 +67,17 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   cmd_vel_timeout_ = declare_parameter("cmd_vel_timeout", 0.5);
   publish_dt_ = 1.0 / publish_rate;
 
-  // ZMQ: bind PUB socket so the deploy stack SUB can connect to us
-  zmq_sock_ = std::make_unique<zmq::socket_t>(zmq_ctx_, zmq::socket_type::pub);
+  // ZMQ: bind XPUB socket so the deploy stack SUB can connect to us.
+  // XPUB = extended PUB: identical to PUB for sending, but additionally delivers
+  // subscription frames when a subscriber connects (0x01 + filter) or disconnects
+  // (0x00 + filter).  We poll these in TimerCallback to track deploy_connected_.
+  zmq_sock_ = std::make_unique<zmq::socket_t>(zmq_ctx_, zmq::socket_type::xpub);
   const std::string addr = "tcp://0.0.0.0:" + std::to_string(zmq_port);
   zmq_sock_->bind(addr);
-  RCLCPP_INFO(get_logger(), "Bound ZMQ PUB to %s", addr.c_str());
+  RCLCPP_INFO(get_logger(),
+              "Bound ZMQ XPUB to %s. "
+              "Execute gear_sonic's ./deploy.sh and ensure the ZMQ connection is available.",
+              addr.c_str());
 
   // ── Services ────────────────────────────────────────────────────────────
 
@@ -122,7 +128,7 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   const auto period = std::chrono::duration<double>(publish_dt_);
   timer_ = create_wall_timer(period, [this]() { TimerCallback(); });
 
-  RCLCPP_INFO(get_logger(), "Ready. Call ~/enable_control service true to start.");
+  // "Ready" is logged later, once the gear_sonic ZMQ connection is established.
 }
 
 GearSonicInterface::~GearSonicInterface()
@@ -142,6 +148,14 @@ void GearSonicInterface::OnEnableControl(std_srvs::srv::SetBool::Request::Shared
                                          std_srvs::srv::SetBool::Response::SharedPtr res)
 {
   if (req->data) {
+    if (!deploy_connected_) {
+      RCLCPP_ERROR(get_logger(),
+                   "enable_control(true) rejected: gear_sonic is not connected via ZMQ. "
+                   "Execute gear_sonic's ./deploy.sh and ensure the ZMQ connection is available.");
+      res->success = false;
+      res->message = "gear_sonic ZMQ connection not available";
+      return;
+    }
     // Mirrors the pico_manager manager loop order
     // (gear_sonic/scripts/pico_manager_thread_server.py, manager main loop):
     //   run_once() sends a planner message FIRST, then the start command is sent AFTER.
@@ -252,7 +266,35 @@ void GearSonicInterface::OnHead(geometry_msgs::msg::PoseStamped::ConstSharedPtr 
 
 void GearSonicInterface::TimerCallback()
 {
+  // Poll XPUB subscription frames (non-blocking).
+  // 0x01 prefix = subscriber connected; 0x00 prefix = subscriber disconnected.
+  // Safe to call from the same thread as send().
+  {
+    zmq::message_t sub_msg;
+    while (zmq_sock_->recv(sub_msg, zmq::recv_flags::dontwait)) {
+      if (sub_msg.size() >= 1) {
+        const bool connected = (static_cast<const uint8_t*>(sub_msg.data())[0] == 0x01);
+        if (connected && !deploy_connected_) {
+          deploy_connected_ = true;
+          RCLCPP_INFO(get_logger(), "gear_sonic ZMQ connection established. "
+                                    "Call ~/enable_control true to start.");
+        } else if (!connected && deploy_connected_) {
+          deploy_connected_ = false;
+          RCLCPP_WARN(get_logger(), "gear_sonic ZMQ connection lost.");
+        }
+      }
+    }
+  }
+
   if (!control_active_) {
+    return;
+  }
+
+  if (!deploy_connected_) {
+    RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 5000,
+        "Planner messages not sent: gear_sonic ZMQ connection not available. "
+        "Execute gear_sonic's ./deploy.sh and ensure the ZMQ connection is available.");
     return;
   }
 
