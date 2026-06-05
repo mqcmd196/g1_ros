@@ -79,12 +79,14 @@ namespace g1_hardware
  *       angular.z → turn rate      (rad/s); accumulated into heading angle
  *       speed is always -1 (auto) as per SONIC's default
  *
- *   ~/left_wrist  (geometry_msgs/PoseStamped, subscribe)
- *   ~/right_wrist (geometry_msgs/PoseStamped, subscribe)
- *   ~/head        (geometry_msgs/PoseStamped, subscribe)
- *       VR 3-point upper-body targets.  All three must be received before
- *       vr_position/vr_orientation are included in the planner message.
- *       Until then, bare planner messages (locomotion only) are sent.
+ *   ~/target_left_wrist_yaw_link  (geometry_msgs/PoseStamped, subscribe)
+ *   ~/target_right_wrist_yaw_link (geometry_msgs/PoseStamped, subscribe)
+ *   ~/target_torso_link           (geometry_msgs/PoseStamped, subscribe)
+ *       VR 3-point upper-body targets (link names from G1 URDF).
+ *       Sending any one topic enables VR tracking; unpublished endpoints
+ *       hold their default values (natural standing pose FK result).
+ *       vr_3point_body_offset (from motion.yaml) is NOT applied here —
+ *       the caller is responsible for the offset if exact joint control is needed.
  *
  * ── Coordinate frame for PoseStamped positions ────────────────────────────
  *   Positions must be in the G1's "pelvis" TF frame (URDF root link).
@@ -152,12 +154,21 @@ private:
 
   // VR 3-point upper-body targets
   // vr_position: [Lw_x,y,z, Rw_x,y,z, H_x,y,z]  (pelvis frame)
-  std::array<float, 9> vr_position_{};
+  // Default values from gear_sonic_deploy zmq_endpoint_interface.hpp
+  // (InputInterface defaults, natural standing pose FK result).
+  std::array<float, 9> vr_position_{
+      0.0903f, 0.1615f,  -0.2411f, // left  wrist
+      0.1280f, -0.1522f, -0.2461f, // right wrist
+      0.0241f, -0.0081f, 0.4028f,  // head
+  };
   // vr_orientation: [Lw_qw,qx,qy,qz, Rw_qw,qx,qy,qz, H_qw,qx,qy,qz]
-  std::array<float, 12> vr_orientation_{1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
-  bool left_received_{false};
-  bool right_received_{false};
-  bool head_received_{false};
+  // Default values from same source.
+  std::array<float, 12> vr_orientation_{
+      0.7295f, 0.3145f,  0.5533f, -0.2506f, // left
+      0.7320f, -0.2639f, 0.5395f, 0.3217f,  // right
+      0.9991f, 0.011f,   0.0402f, -0.0002f, // head
+  };
+  bool any_pose_received_{false}; // true once at least one pose topic arrives
 
   bool control_active_{false};
 

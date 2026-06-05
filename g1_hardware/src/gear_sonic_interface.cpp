@@ -109,13 +109,14 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
       "~/cmd_vel", 1, [this](geometry_msgs::msg::Twist::ConstSharedPtr msg) { OnCmdVel(msg); });
 
   left_wrist_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
-      "~/left_wrist", 1,
+      "~/target_left_wrist_yaw_link", 1,
       [this](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) { OnLeftWrist(msg); });
   right_wrist_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
-      "~/right_wrist", 1,
+      "~/target_right_wrist_yaw_link", 1,
       [this](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) { OnRightWrist(msg); });
   head_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
-      "~/head", 1, [this](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) { OnHead(msg); });
+      "~/target_torso_link", 1,
+      [this](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) { OnHead(msg); });
 
   // Timer is always spinning; does nothing until control_active_ is set
   const auto period = std::chrono::duration<double>(publish_dt_);
@@ -220,7 +221,7 @@ void GearSonicInterface::OnLeftWrist(geometry_msgs::msg::PoseStamped::ConstShare
   vr_orientation_[1] = static_cast<float>(msg->pose.orientation.x);
   vr_orientation_[2] = static_cast<float>(msg->pose.orientation.y);
   vr_orientation_[3] = static_cast<float>(msg->pose.orientation.z);
-  left_received_ = true;
+  any_pose_received_ = true;
 }
 
 void GearSonicInterface::OnRightWrist(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
@@ -233,7 +234,7 @@ void GearSonicInterface::OnRightWrist(geometry_msgs::msg::PoseStamped::ConstShar
   vr_orientation_[5] = static_cast<float>(msg->pose.orientation.x);
   vr_orientation_[6] = static_cast<float>(msg->pose.orientation.y);
   vr_orientation_[7] = static_cast<float>(msg->pose.orientation.z);
-  right_received_ = true;
+  any_pose_received_ = true;
 }
 
 void GearSonicInterface::OnHead(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
@@ -246,7 +247,7 @@ void GearSonicInterface::OnHead(geometry_msgs::msg::PoseStamped::ConstSharedPtr 
   vr_orientation_[9] = static_cast<float>(msg->pose.orientation.x);
   vr_orientation_[10] = static_cast<float>(msg->pose.orientation.y);
   vr_orientation_[11] = static_cast<float>(msg->pose.orientation.z);
-  head_received_ = true;
+  any_pose_received_ = true;
 }
 
 void GearSonicInterface::TimerCallback()
@@ -368,8 +369,11 @@ void GearSonicInterface::TimerCallback()
   }
 
   // ── Build planner message ──────────────────────────────────────────────
+  // Include vr_position/vr_orientation as soon as ANY pose topic has been received.
+  // Endpoints that have not been published yet keep their default values (set in the
+  // header: natural standing pose in pelvis frame), so a single-topic publisher works.
   std::vector<uint8_t> msg;
-  if (left_received_ && right_received_ && head_received_) {
+  if (any_pose_received_) {
     msg = BuildPlannerMessage(active_mode, movement, facing, speed, /*height=*/-1.0f, &vr_position_,
                               &vr_orientation_);
   } else {

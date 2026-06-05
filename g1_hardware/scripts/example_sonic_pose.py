@@ -9,13 +9,13 @@ class ExampleSonicPoseNode(Node):
     def __init__(self):
         super().__init__("example_sonic_pose_node")
         self.pub_left = self.create_publisher(
-            PoseStamped, "/gear_sonic_interface/left_wrist", 10
+            PoseStamped, "/gear_sonic_interface/target_left_wrist_yaw_link", 10
         )
         self.pub_right = self.create_publisher(
-            PoseStamped, "/gear_sonic_interface/right_wrist", 10
+            PoseStamped, "/gear_sonic_interface/target_right_wrist_yaw_link", 10
         )
-        self.pub_head = self.create_publisher(
-            PoseStamped, "/gear_sonic_interface/head", 10
+        self.pub_torso = self.create_publisher(
+            PoseStamped, "/gear_sonic_interface/target_torso_link", 10
         )
         self.timer = self.create_timer(0.02, self.publish)  # 50 Hz
 
@@ -35,9 +35,13 @@ class ExampleSonicPoseNode(Node):
     def publish(self):
         # Positions in the G1 "pelvis" frame (robot body frame, origin at pelvis).
         # Adjust these values to test different poses.
-        self.pub_left.publish(self._make_pose(x=0.3, y=0.3, z=0.0))  # left wrist
-        self.pub_right.publish(self._make_pose(x=0.3, y=-0.3, z=0.0))  # right wrist
-        self.pub_head.publish(self._make_pose(x=0.0, y=0.0, z=0.5))  # head
+        self.pub_left.publish(
+            self._make_pose(x=0.3, y=0.3, z=0.0)
+        )  # left_wrist_yaw_link
+        self.pub_right.publish(
+            self._make_pose(x=0.3, y=-0.3, z=0.0)
+        )  # right_wrist_yaw_link
+        self.pub_torso.publish(self._make_pose(x=0.0, y=0.0, z=0.5))  # torso_link
 
 
 def main(args=None):
