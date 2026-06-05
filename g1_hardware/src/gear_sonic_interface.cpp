@@ -82,11 +82,6 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
       [this](std_srvs::srv::SetBool::Request::SharedPtr req,
              std_srvs::srv::SetBool::Response::SharedPtr res) { OnEnableControl(req, res); });
 
-  start_balance_srv_ = create_service<std_srvs::srv::SetBool>(
-      "~/start_balance",
-      [this](std_srvs::srv::SetBool::Request::SharedPtr req,
-             std_srvs::srv::SetBool::Response::SharedPtr res) { OnStartBalance(req, res); });
-
   // One Trigger service per locomotion mode: ~/mode/<name>
   for (const auto& [mode_val, mode_name] : kLocomotionModes) {
     auto srv = create_service<std_srvs::srv::Trigger>(
@@ -118,7 +113,7 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   const auto period = std::chrono::duration<double>(publish_dt_);
   timer_ = create_wall_timer(period, [this]() { TimerCallback(); });
 
-  RCLCPP_INFO(get_logger(), "Ready. Call ~/enable_control then ~/start_balance to begin.");
+  RCLCPP_INFO(get_logger(), "Ready. Call ~/enable_control true to start.");
 }
 
 GearSonicInterface::~GearSonicInterface()
@@ -138,43 +133,34 @@ void GearSonicInterface::OnEnableControl(std_srvs::srv::SetBool::Request::Shared
                                          std_srvs::srv::SetBool::Response::SharedPtr res)
 {
   if (req->data) {
-    // Equivalent to PICO A+B+X+Y: deploy transitions WAIT_FOR_CONTROL → CONTROL
-    const auto msg = BuildCommandMessage(/*start=*/true, /*stop=*/false, /*planner=*/true);
-    zmq_sock_->send(zmq::buffer(msg), zmq::send_flags::none);
-    RCLCPP_INFO(get_logger(), "enable_control(true): sent start command.");
-  } else {
-    std::lock_guard<std::mutex> lock(data_mutex_);
-    control_active_ = false;
-    const auto msg = BuildCommandMessage(/*start=*/false, /*stop=*/true, /*planner=*/false);
-    zmq_sock_->send(zmq::buffer(msg), zmq::send_flags::none);
-    RCLCPP_INFO(get_logger(), "enable_control(false): sent stop command.");
-  }
-  res->success = true;
-}
-
-void GearSonicInterface::OnStartBalance(std_srvs::srv::SetBool::Request::SharedPtr req,
-                                        std_srvs::srv::SetBool::Response::SharedPtr res)
-{
-  if (req->data) {
-    // Equivalent to PICO A+X entering PLANNER_VR_3PT:
-    //   - send command{start=1, planner=1}
-    //   - begin sending bare planner messages (no upper_body_position, matching
-    //     pico_manager run_once() where upper_body_position=None in VR_3PT mode)
-    //   - SONIC autonomously holds the natural standing pose until vr_position arrives
-    const auto cmd_msg = BuildCommandMessage(/*start=*/true, /*stop=*/false, /*planner=*/true);
-    zmq_sock_->send(zmq::buffer(cmd_msg), zmq::send_flags::none);
+    // Mirrors the pico_manager manager loop order (line 2022-2034 in
+    // pico_manager_thread_server.py):
+    //   run_once() sends a planner message FIRST, then the start command is sent AFTER.
+    // This ensures the deploy stack's planner buffer is populated before it enters CONTROL,
+    // preventing the policy from running with empty input and going to a bad pose.
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
+      heading_rad_ = 0.0;
       control_active_ = true;
-      heading_rad_ = 0.0; // reset heading on balance start
     }
-    RCLCPP_INFO(get_logger(), "start_balance(true): SONIC is in control. "
+    // 1. Send one planner message (IDLE, zero velocity) so the deploy has data on entry
+    const auto planner_msg = BuildPlannerMessage(
+        /*mode=*/0, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
+        /*speed=*/-1.0f, /*height=*/-1.0f);
+    zmq_sock_->send(zmq::buffer(planner_msg), zmq::send_flags::none);
+    // 2. Send start command — deploy transitions WAIT_FOR_CONTROL → CONTROL
+    const auto cmd_msg = BuildCommandMessage(/*start=*/true, /*stop=*/false, /*planner=*/true);
+    zmq_sock_->send(zmq::buffer(cmd_msg), zmq::send_flags::none);
+    RCLCPP_INFO(get_logger(), "enable_control(true): SONIC is in control. "
                               "Use ~/cmd_vel for locomotion, ~/mode/* for mode, "
                               "~/left_wrist + ~/right_wrist + ~/head for VR 3-point tracking.");
   } else {
+    // Stop sending planner messages. Do NOT send command{stop=1}:
+    // that triggers CreateDampingCommand() (kp=0, kd=8) → robot goes limp.
+    // The deploy's 1-second planner timeout reverts to IDLE while keeping balance.
     std::lock_guard<std::mutex> lock(data_mutex_);
     control_active_ = false;
-    RCLCPP_INFO(get_logger(), "start_balance(false): stopped sending planner messages.");
+    RCLCPP_INFO(get_logger(), "enable_control(false): stopped. Robot reverts to IDLE after ~1 s.");
   }
   res->success = true;
 }

@@ -53,12 +53,12 @@ namespace g1_hardware
  *
  * ── Services ──────────────────────────────────────────────────────────────
  *   ~/enable_control  (std_srvs/SetBool)
- *       true  → command{start=1, planner=1}  (deploy: WAIT_FOR_CONTROL → CONTROL)
- *       false → command{stop=1}
- *
- *   ~/start_balance   (std_srvs/SetBool)
- *       true  → command{start=1, planner=1}, begin sending planner messages
- *       false → stop sending planner messages
+ *       true  → (1) send planner{IDLE, zero vel} first, then command{start=1, planner=1}
+ *               Mirrors pico_manager order: planner message before start command, so the
+ *               deploy stack has planner data when entering CONTROL (prevents bad initial pose).
+ *               Also resets heading and starts the timer.
+ *       false → stop sending planner messages only (no stop=1 command).
+ *               Deploy reverts to IDLE after its 1-second planner timeout; robot stays balanced.
  *
  *   ~/mode/<name>     (std_srvs/Trigger) — switch locomotion mode instantly
  *       idle, slow_walk, walk, run, idle_squat, idle_kneel_two_legs,
@@ -106,8 +106,6 @@ public:
 private:
   void OnEnableControl(std_srvs::srv::SetBool::Request::SharedPtr req,
                        std_srvs::srv::SetBool::Response::SharedPtr res);
-  void OnStartBalance(std_srvs::srv::SetBool::Request::SharedPtr req,
-                      std_srvs::srv::SetBool::Response::SharedPtr res);
   void OnCmdVel(geometry_msgs::msg::Twist::ConstSharedPtr msg);
   void OnLeftWrist(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg);
   void OnRightWrist(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg);
@@ -125,7 +123,6 @@ private:
                       const std::array<float, 12>* vr_orientation = nullptr);
 
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr enable_control_srv_;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr start_balance_srv_;
   // One Trigger service per LocomotionMode (indexed by mode value 0–19)
   std::vector<rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr> mode_services_;
 
