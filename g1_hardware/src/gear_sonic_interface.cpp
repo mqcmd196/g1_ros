@@ -62,6 +62,7 @@ static constexpr int kAutoMode = -1; // auto: IDLE/SLOW_WALK/WALK/RUN selected b
 GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
 : rclcpp::Node("gear_sonic_interface", options)
 {
+  const std::string zmq_host = declare_parameter("zmq_host", "0.0.0.0");
   const int zmq_port = declare_parameter("zmq_port", 5556);
   const double publish_rate = declare_parameter("publish_rate", 50.0);
   cmd_vel_timeout_ = declare_parameter("cmd_vel_timeout", 0.5);
@@ -72,12 +73,12 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   // subscription frames when a subscriber connects (0x01 + filter) or disconnects
   // (0x00 + filter).  We poll these in TimerCallback to track deploy_connected_.
   zmq_sock_ = std::make_unique<zmq::socket_t>(zmq_ctx_, zmq::socket_type::xpub);
-  const std::string addr = "tcp://0.0.0.0:" + std::to_string(zmq_port);
-  zmq_sock_->bind(addr);
+  const std::string addr = "tcp://" + zmq_host + ":" + std::to_string(zmq_port);
   RCLCPP_INFO(get_logger(),
               "Bound ZMQ XPUB to %s. "
               "Execute gear_sonic's ./deploy.sh and ensure the ZMQ connection is available.",
               addr.c_str());
+  zmq_sock_->bind(addr);
 
   // ── Services ────────────────────────────────────────────────────────────
 
