@@ -12,6 +12,7 @@ ament_auto_find_build_dependencies()
 
 # unitree_sdk2 uses a namespaced target, not auto-detectable via ament_auto
 find_package(unitree_sdk2 REQUIRED)
+find_package(cppzmq REQUIRED)
 
 ament_auto_add_library(${PROJECT_NAME} SHARED
   src/g1_hardware_interface.cpp
@@ -20,6 +21,19 @@ ament_auto_add_library(${PROJECT_NAME} SHARED
 
 target_link_libraries(${PROJECT_NAME}
   unitree_sdk2
+)
+
+ament_auto_add_library(gear_sonic_interface SHARED
+  src/gear_sonic_interface.cpp
+)
+
+target_link_libraries(gear_sonic_interface
+  cppzmq
+)
+
+rclcpp_components_register_node(gear_sonic_interface
+  PLUGIN "g1_hardware::GearSonicInterface"
+  EXECUTABLE gear_sonic_interface_node
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE "PLUGINLIB_BUILDING_LIBRARY")
@@ -37,6 +51,11 @@ rclcpp_components_register_node(loco_cmd_adapter
 
 install(FILES g1_hardware_plugin.xml
   DESTINATION share/${PROJECT_NAME})
+
+install(
+  PROGRAMS scripts/example_sonic_pose.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -7,7 +7,9 @@
   <maintainer email="mqcmd196@hotmail.co.jp">Yoshiki Obinata</maintainer>
   <license>BSD-3-Clause</license>
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
+  <depend>geometry_msgs</depend>
   <depend>hardware_interface</depend>
+  <depend>libzmq3-dev</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
