@@ -99,13 +99,14 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
 
   // One Trigger service per non-locomotion mode: ~/mode/<name>
   for (const auto& [mode_val, mode_name] : kLocomotionModes) {
+    const int mv = mode_val;
     auto srv = create_service<std_srvs::srv::Trigger>(
-        "~/mode/" + mode_name, [this, mode_val](std_srvs::srv::Trigger::Request::SharedPtr,
-                                                std_srvs::srv::Trigger::Response::SharedPtr res) {
+        "~/mode/" + mode_name, [this, mv](std_srvs::srv::Trigger::Request::SharedPtr,
+                                          std_srvs::srv::Trigger::Response::SharedPtr res) {
           std::lock_guard<std::mutex> lock(data_mutex_);
-          locomotion_mode_ = mode_val;
+          locomotion_mode_ = mv;
           res->success = true;
-          RCLCPP_INFO(get_logger(), "Locomotion mode → %d", mode_val);
+          RCLCPP_INFO(get_logger(), "Locomotion mode → %d", mv);
         });
     mode_services_.push_back(srv);
   }
@@ -489,19 +490,23 @@ std::vector<uint8_t> GearSonicInterface::BuildPlannerMessage(
 
   // All values are little-endian; x86 is natively LE so memcpy is correct
   append(msg, &mode, 4);
-  for (float v : movement)
+  for (float v : movement) {
     append(msg, &v, 4);
-  for (float v : facing)
+  }
+  for (float v : facing) {
     append(msg, &v, 4);
+  }
   append(msg, &speed, 4);
   append(msg, &height, 4);
   if (vr_position) {
-    for (float v : *vr_position)
+    for (float v : *vr_position) {
       append(msg, &v, 4);
+    }
   }
   if (vr_orientation) {
-    for (float v : *vr_orientation)
+    for (float v : *vr_orientation) {
       append(msg, &v, 4);
+    }
   }
   return msg;
 }
