@@ -14,6 +14,7 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>rclcpp_lifecycle</depend>
+  <depend>sensor_msgs</depend>
   <depend>std_srvs</depend>
   <depend>unitree_sdk2</depend>
   <exec_depend>g1_description</exec_depend>
