@@ -49,6 +49,19 @@ rclcpp_components_register_node(loco_cmd_adapter
   EXECUTABLE loco_cmd_adapter_node
 )
 
+ament_auto_add_library(g1_livox_interface SHARED
+  src/g1_livox_interface.cpp
+)
+
+target_link_libraries(g1_livox_interface
+  unitree_sdk2
+)
+
+rclcpp_components_register_node(g1_livox_interface
+  PLUGIN "g1_hardware::G1LivoxInterfaceNode"
+  EXECUTABLE g1_livox_interface_node
+)
+
 install(FILES g1_hardware_plugin.xml
   DESTINATION share/${PROJECT_NAME})
 

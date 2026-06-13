@@ -61,7 +61,6 @@ _HARDWARE_CONFIG = {
         "urdf_xacro": "g1_no_hand_real.urdf.xacro",
         "srdf": "g1_no_hand.srdf",
         "controllers": [
-            "joint_state_broadcaster",
             "upper_body_controller",
         ],
     },
@@ -69,7 +68,6 @@ _HARDWARE_CONFIG = {
         "urdf_xacro": "g1_inspire_dfq_real.urdf.xacro",
         "srdf": "g1_inspire_dfq.srdf",
         "controllers": [
-            "joint_state_broadcaster",
             "upper_body_controller",
             "right_hand_controller",
             "left_hand_controller",
