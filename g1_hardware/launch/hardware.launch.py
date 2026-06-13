@@ -30,13 +30,13 @@
 G1 real-hardware ROS2 driver launch.
 
 Starts:
-  - robot_state_publisher  (URDF with g1_hardware plugin)
-  - ros2_control_node      (talks to robot via DDS)
-  - loco_cmd_adapter       (accepting locomotion mode, cmd_vel)
+  - robot_state_publisher    (URDF with g1_hardware plugin)
+  - ros2_control_node        (talks to robot via DDS)
+  - loco_cmd_adapter         (accepting locomotion mode, cmd_vel)
+  - joint_state_broadcaster  (infrastructure: required for TF / RViz)
 
-Controller spawning is intentionally left to the bringup layer
-so that this launch can be reused regardless of which controllers
-the application needs.
+Application-specific controller spawning (upper_body_controller,
+hand controllers, etc.) is intentionally left to the bringup layer.
 
 Usage:
   ros2 launch g1_hardware hardware.launch.py network_interface:=eth0
@@ -141,6 +141,11 @@ def _launch_setup(context, *args, **kwargs):
                     parameters=[{"network_interface": network_interface}],
                 ),
             ],
+        ),
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["joint_state_broadcaster"],
         ),
     ]
 
