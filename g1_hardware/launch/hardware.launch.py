@@ -134,6 +134,12 @@ def _launch_setup(context, *args, **kwargs):
                     name="loco_cmd_adapter",
                     parameters=[{"network_interface": network_interface}],
                 ),
+                ComposableNode(
+                    package="g1_hardware",
+                    plugin="g1_hardware::G1LivoxInterfaceNode",
+                    name="g1_livox_interface",
+                    parameters=[{"network_interface": network_interface}],
+                ),
             ],
         ),
     ]
