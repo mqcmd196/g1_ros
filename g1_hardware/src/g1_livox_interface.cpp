@@ -54,10 +54,11 @@ G1LivoxInterfaceNode::G1LivoxInterfaceNode(const rclcpp::NodeOptions& options)
       [this](const void* msg) {
         const sensor_msgs::msg::dds_::PointCloud2_* lidar_msg =
             static_cast<const sensor_msgs::msg::dds_::PointCloud2_*>(msg);
+        frame_id_ = lidar_msg->header().frame_id();
         const auto ros_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
         ros_msg->header.stamp.sec = lidar_msg->header().stamp().sec();
         ros_msg->header.stamp.nanosec = lidar_msg->header().stamp().nanosec();
-        ros_msg->header.frame_id = lidar_msg->header().frame_id();
+        ros_msg->header.frame_id = frame_id_;
         ros_msg->height = lidar_msg->height();
         ros_msg->width = lidar_msg->width();
         const auto& fields = lidar_msg->fields();
@@ -81,6 +82,9 @@ G1LivoxInterfaceNode::G1LivoxInterfaceNode(const rclcpp::NodeOptions& options)
 
   imu_sub_->InitChannel(
       [this](const void* msg) {
+        if (frame_id_.empty()) {
+          return;
+        }
         const sensor_msgs::msg::dds_::Imu_* imu_msg =
             static_cast<const sensor_msgs::msg::dds_::Imu_*>(msg);
         const auto ros_msg = std::make_shared<sensor_msgs::msg::Imu>();

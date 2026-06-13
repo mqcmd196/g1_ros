@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+      livox_frame: the frame embedded in Livox Mid-360 point cloud / IMU messages.
+      It is the mid360_link rotated 180 degrees around the X axis.
+  -->
+  <link name="livox_frame"/>
+  <joint name="livox_frame_joint" type="fixed">
+    <parent link="mid360_link"/>
+    <child link="livox_frame"/>
+    <origin xyz="0 0 0" rpy="3.14159265358979 0 0"/>
+  </joint>
+</robot>
