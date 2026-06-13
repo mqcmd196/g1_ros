@@ -90,7 +90,7 @@ G1LivoxInterfaceNode::G1LivoxInterfaceNode(const rclcpp::NodeOptions& options)
         const auto ros_msg = std::make_shared<sensor_msgs::msg::Imu>();
         ros_msg->header.stamp.sec = imu_msg->header().stamp().sec();
         ros_msg->header.stamp.nanosec = imu_msg->header().stamp().nanosec();
-        ros_msg->header.frame_id = imu_msg->header().frame_id();
+        ros_msg->header.frame_id = frame_id_;
         ros_msg->orientation.x = imu_msg->orientation().x();
         ros_msg->orientation.y = imu_msg->orientation().y();
         ros_msg->orientation.z = imu_msg->orientation().z();
