@@ -559,16 +559,21 @@ void GearSonicInterface::OnEnableSmplStream(std_srvs::srv::SetBool::Request::Sha
       std::lock_guard<std::mutex> lock(data_mutex_);
       streaming_smpl_ = false;
       smpl_window_.clear();
+      // Auto-resume planner/VR-3PT control so disabling the SMPL stream alone returns the
+      // robot to its normal state — no separate ~/enable_control call needed.
+      control_active_ = true;
     }
     // Return to planner balance/IDLE so the robot re-stabilizes instead of toppling once the
     // streamed frames stop. Planner message first, then the planner-mode command (same order
-    // as OnEnableControl). The timer then resumes cmd_vel/mode planner control.
+    // as OnEnableControl). The timer then resumes cmd_vel/mode/VR-3PT planner control.
     const auto planner_msg = BuildPlannerMessage(
         /*mode=*/0, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, /*speed=*/-1.0f, /*height=*/-1.0f);
     zmq_sock_->send(zmq::buffer(planner_msg), zmq::send_flags::none);
     const auto cmd_msg = BuildCommandMessage(/*start=*/true, /*stop=*/false, /*planner=*/true);
     zmq_sock_->send(zmq::buffer(cmd_msg), zmq::send_flags::none);
-    RCLCPP_INFO(get_logger(), "enable_smpl_stream(false): back to planner balance (IDLE).");
+    RCLCPP_INFO(get_logger(),
+                "enable_smpl_stream(false): back to planner/VR-3PT control (IDLE balance). "
+                "No separate enable_control needed.");
   }
   res->success = true;
 }

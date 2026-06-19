@@ -44,12 +44,11 @@ Run it with ``ros2 run g1_hardware replay_smpl_motion.py --ros-args -p clip:=<pa
 import glob
 import os
 
+from gear_sonic_interfaces.msg import SmplMotion
 import numpy as np
 import rclpy
 from rclpy.node import Node
 from std_srvs.srv import SetBool
-
-from gear_sonic_interfaces.msg import SmplMotion
 
 
 def _load_clip(clip_path):
@@ -129,31 +128,39 @@ class ReplaySmplMotionNode(Node):
             self.get_logger().info("enable_control(true): balancing before motion")
             self._call(self.enable_control, True)
             self._sleep(self.idle_before)
-            self.get_logger().info("enable_smpl_stream(true): streamed-motion mode")
-            self._call(self.enable_stream, True)
 
-        period = 1.0 / max(1e-6, self.rate)
-        for i, fr in enumerate(self.frames):
-            msg = SmplMotion()
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.frame_index = i
-            msg.smpl_pose = fr["smpl_pose"].tolist()
-            msg.smpl_joints = fr["smpl_joints"].tolist()
-            q = fr["body_quat_w"]  # recorded as scalar-first (w, x, y, z)
-            msg.body_quat.w = float(q[0])
-            msg.body_quat.x = float(q[1])
-            msg.body_quat.y = float(q[2])
-            msg.body_quat.z = float(q[3])
-            msg.joint_pos = fr["joint_pos"].tolist()
-            msg.joint_vel = fr["joint_vel"].tolist()
-            self.pub.publish(msg)
-            self._sleep(period)
-        self.get_logger().info(f"published {len(self.frames)} SmplMotion frames")
+        # Everything after streaming is enabled goes in try/finally so the robot is ALWAYS
+        # handed back to planner balance — even on Ctrl-C or an exception. Otherwise the node
+        # stays stuck in streamed-motion mode and ignores subsequent planner/VR commands.
+        try:
+            if self.manage:
+                self.get_logger().info("enable_smpl_stream(true): streamed-motion mode")
+                self._call(self.enable_stream, True)
 
-        if self.manage:
-            self.get_logger().info("enable_smpl_stream(false): back to planner balance")
-            self._call(self.enable_stream, False)
-            self._sleep(self.idle_after)
+            period = 1.0 / max(1e-6, self.rate)
+            for i, fr in enumerate(self.frames):
+                msg = SmplMotion()
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.frame_index = i
+                msg.smpl_pose = fr["smpl_pose"].tolist()
+                msg.smpl_joints = fr["smpl_joints"].tolist()
+                q = fr["body_quat_w"]  # recorded as scalar-first (w, x, y, z)
+                msg.body_quat.w = float(q[0])
+                msg.body_quat.x = float(q[1])
+                msg.body_quat.y = float(q[2])
+                msg.body_quat.z = float(q[3])
+                msg.joint_pos = fr["joint_pos"].tolist()
+                msg.joint_vel = fr["joint_vel"].tolist()
+                self.pub.publish(msg)
+                self._sleep(period)
+            self.get_logger().info(f"published {len(self.frames)} SmplMotion frames")
+        finally:
+            if self.manage:
+                self.get_logger().info(
+                    "enable_smpl_stream(false): back to planner balance"
+                )
+                self._call(self.enable_stream, False)
+                self._sleep(self.idle_after)
 
     def _sleep(self, seconds):
         # Spin while sleeping so service futures/timers progress.
