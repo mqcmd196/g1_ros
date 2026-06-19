@@ -30,10 +30,13 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
+#include <deque>
 #include <mutex>
 #include <string>
 #include <vector>
 
+#include <gear_sonic_interfaces/msg/smpl_motion.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -121,6 +124,11 @@ private:
   void OnHead(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg);
   void TimerCallback();
 
+  // Full-body SMPL streaming (streamed-motion mode), used e.g. to make the robot jump.
+  void OnEnableSmplStream(std_srvs::srv::SetBool::Request::SharedPtr req,
+                          std_srvs::srv::SetBool::Response::SharedPtr res);
+  void OnSmplMotion(gear_sonic_interfaces::msg::SmplMotion::ConstSharedPtr msg);
+
   // ZMQ wire-format builders (replicates gear_sonic/utils/teleop/zmq/zmq_planner_sender.py)
   static std::vector<uint8_t> BuildZmqHeader(const std::string& fields_json, int version = 1);
   static std::vector<uint8_t> BuildCommandMessage(bool start, bool stop, bool planner);
@@ -131,6 +139,21 @@ private:
                       float speed, float height, const std::array<float, 9>* vr_position = nullptr,
                       const std::array<float, 12>* vr_orientation = nullptr);
 
+  // One buffered frame of processed SMPL motion (deploy "pose"/streamed-motion stream).
+  struct SmplFrame
+  {
+    std::array<float, 63> smpl_pose{};   // 21 x 3 axis-angle
+    std::array<float, 72> smpl_joints{}; // 24 x 3 positions
+    std::array<float, 4> body_quat_w{};  // root orientation, scalar-first (w,x,y,z)
+    std::array<float, 29> joint_pos{};
+    std::array<float, 29> joint_vel{};
+    int64_t frame_index{0};
+  };
+
+  // Pack a sliding window of frames into a "pose" topic message (protocol v3),
+  // replicating gear_sonic/utils/teleop/zmq/zmq_planner_sender.py pack_pose_message().
+  static std::vector<uint8_t> BuildPoseMessage(const std::deque<SmplFrame>& frames);
+
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr enable_control_srv_;
   // One Trigger service per LocomotionMode (indexed by mode value 0–19)
   std::vector<rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr> mode_services_;
@@ -139,6 +162,8 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr left_wrist_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr right_wrist_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr head_sub_;
+  rclcpp::Subscription<gear_sonic_interfaces::msg::SmplMotion>::SharedPtr smpl_motion_sub_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr enable_smpl_stream_srv_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   std::mutex data_mutex_;
@@ -172,6 +197,14 @@ private:
   bool any_pose_received_{false}; // true once at least one pose topic arrives
 
   bool control_active_{false};
+
+  // Full-body SMPL streaming state. When streaming_smpl_ is true the deploy is in
+  // streamed-motion mode and the timer stops sending planner messages; pose messages are
+  // sent from OnSmplMotion instead. A sliding window of frames is sent per message, matching
+  // the pico_manager pose stream (deque maxlen = smpl_window_size_).
+  bool streaming_smpl_{false};
+  size_t smpl_window_size_{5};
+  std::deque<SmplFrame> smpl_window_;
 
   zmq::context_t zmq_ctx_;
   // XPUB (extended PUB) instead of plain PUB: notifies us when a subscriber

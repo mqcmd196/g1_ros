@@ -66,7 +66,10 @@ install(FILES g1_hardware_plugin.xml
   DESTINATION share/${PROJECT_NAME})
 
 install(
-  PROGRAMS scripts/example_sonic_pose.py
+  PROGRAMS
+    scripts/example_sonic_pose.py
+    scripts/replay_smpl_motion.py
+    scripts/example_smpl_jump
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -82,5 +85,5 @@ if(BUILD_TESTING)
 endif()
 
 ament_auto_package(
-  INSTALL_TO_SHARE config launch
+  INSTALL_TO_SHARE config data launch
 )

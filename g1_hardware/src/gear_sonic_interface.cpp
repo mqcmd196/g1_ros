@@ -66,6 +66,7 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   const int zmq_port = declare_parameter("zmq_port", 5556);
   const double publish_rate = declare_parameter("publish_rate", 50.0);
   cmd_vel_timeout_ = declare_parameter("cmd_vel_timeout", 0.5);
+  smpl_window_size_ = static_cast<size_t>(declare_parameter("smpl_window_size", 5));
   publish_dt_ = 1.0 / publish_rate;
 
   // ZMQ: bind XPUB socket so the deploy stack SUB can connect to us.
@@ -125,6 +126,15 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   head_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
       "~/target_torso_link", 1,
       [this](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) { OnHead(msg); });
+
+  // Full-body SMPL streaming (streamed-motion mode), used e.g. for jumps.
+  enable_smpl_stream_srv_ = create_service<std_srvs::srv::SetBool>(
+      "~/enable_smpl_stream",
+      [this](std_srvs::srv::SetBool::Request::SharedPtr req,
+             std_srvs::srv::SetBool::Response::SharedPtr res) { OnEnableSmplStream(req, res); });
+  smpl_motion_sub_ = create_subscription<gear_sonic_interfaces::msg::SmplMotion>(
+      "~/smpl_motion", 10,
+      [this](gear_sonic_interfaces::msg::SmplMotion::ConstSharedPtr msg) { OnSmplMotion(msg); });
 
   // Timer is always spinning; does nothing until control_active_ is set
   const auto period = std::chrono::duration<double>(publish_dt_);
@@ -288,7 +298,9 @@ void GearSonicInterface::TimerCallback()
     }
   }
 
-  if (!control_active_) {
+  // While streaming full-body SMPL the deploy is in streamed-motion mode; pose messages are
+  // sent from OnSmplMotion, so the timer must NOT also push planner messages.
+  if (!control_active_ || streaming_smpl_) {
     return;
   }
 
@@ -507,6 +519,173 @@ std::vector<uint8_t> GearSonicInterface::BuildPlannerMessage(
     for (float v : *vr_orientation) {
       append(msg, &v, 4);
     }
+  }
+  return msg;
+}
+
+// ──────────────────────────────────────────────
+// Full-body SMPL streaming (streamed-motion / "pose" topic)
+// ──────────────────────────────────────────────
+
+void GearSonicInterface::OnEnableSmplStream(std_srvs::srv::SetBool::Request::SharedPtr req,
+                                            std_srvs::srv::SetBool::Response::SharedPtr res)
+{
+  if (req->data) {
+    if (!deploy_connected_) {
+      RCLCPP_ERROR(get_logger(),
+                   "enable_smpl_stream(true) rejected: gear_sonic is not connected via ZMQ. "
+                   "Execute gear_sonic's ./deploy.sh --input-type zmq_manager.");
+      res->success = false;
+      res->message = "gear_sonic ZMQ connection not available";
+      return;
+    }
+    {
+      std::lock_guard<std::mutex> lock(data_mutex_);
+      smpl_window_.clear();
+      streaming_smpl_ = true;
+      control_active_ = true;
+    }
+    // Switch the deploy to streamed-motion mode (planner=0). The robot should already be
+    // standing/balanced (call ~/enable_control true first), so the motion starts from a
+    // stable pose rather than toppling.
+    const auto cmd_msg = BuildCommandMessage(/*start=*/true, /*stop=*/false, /*planner=*/false);
+    zmq_sock_->send(zmq::buffer(cmd_msg), zmq::send_flags::none);
+    RCLCPP_INFO(get_logger(),
+                "enable_smpl_stream(true): streamed-motion mode. Publish "
+                "gear_sonic_interfaces/SmplMotion to ~/smpl_motion (window=%zu frames).",
+                smpl_window_size_);
+  } else {
+    {
+      std::lock_guard<std::mutex> lock(data_mutex_);
+      streaming_smpl_ = false;
+      smpl_window_.clear();
+      // Auto-resume planner/VR-3PT control so disabling the SMPL stream alone returns the
+      // robot to its normal state — no separate ~/enable_control call needed.
+      control_active_ = true;
+    }
+    // Return to planner balance/IDLE so the robot re-stabilizes instead of toppling once the
+    // streamed frames stop. Planner message first, then the planner-mode command (same order
+    // as OnEnableControl). The timer then resumes cmd_vel/mode/VR-3PT planner control.
+    const auto planner_msg = BuildPlannerMessage(
+        /*mode=*/0, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, /*speed=*/-1.0f, /*height=*/-1.0f);
+    zmq_sock_->send(zmq::buffer(planner_msg), zmq::send_flags::none);
+    const auto cmd_msg = BuildCommandMessage(/*start=*/true, /*stop=*/false, /*planner=*/true);
+    zmq_sock_->send(zmq::buffer(cmd_msg), zmq::send_flags::none);
+    RCLCPP_INFO(get_logger(),
+                "enable_smpl_stream(false): back to planner/VR-3PT control (IDLE balance). "
+                "No separate enable_control needed.");
+  }
+  res->success = true;
+}
+
+void GearSonicInterface::OnSmplMotion(gear_sonic_interfaces::msg::SmplMotion::ConstSharedPtr msg)
+{
+  std::vector<uint8_t> pose_msg;
+  {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    if (!streaming_smpl_) {
+      return; // ignore unless ~/enable_smpl_stream true is active
+    }
+    SmplFrame fr;
+    for (size_t i = 0; i < fr.smpl_pose.size(); ++i) {
+      fr.smpl_pose[i] = static_cast<float>(msg->smpl_pose[i]);
+    }
+    for (size_t i = 0; i < fr.smpl_joints.size(); ++i) {
+      fr.smpl_joints[i] = static_cast<float>(msg->smpl_joints[i]);
+    }
+    // geometry_msgs/Quaternion is (x,y,z,w); the deploy "body_quat_w" is scalar-first (w,x,y,z).
+    fr.body_quat_w[0] = static_cast<float>(msg->body_quat.w);
+    fr.body_quat_w[1] = static_cast<float>(msg->body_quat.x);
+    fr.body_quat_w[2] = static_cast<float>(msg->body_quat.y);
+    fr.body_quat_w[3] = static_cast<float>(msg->body_quat.z);
+    for (size_t i = 0; i < fr.joint_pos.size(); ++i) {
+      fr.joint_pos[i] = static_cast<float>(msg->joint_pos[i]);
+    }
+    for (size_t i = 0; i < fr.joint_vel.size(); ++i) {
+      fr.joint_vel[i] = static_cast<float>(msg->joint_vel[i]);
+    }
+    fr.frame_index = msg->frame_index;
+
+    smpl_window_.push_back(fr);
+    while (smpl_window_.size() > smpl_window_size_) {
+      smpl_window_.pop_front();
+    }
+    if (smpl_window_.size() < smpl_window_size_) {
+      return; // wait until the sliding window is full (mirrors pico buffer_cleared logic)
+    }
+    pose_msg = BuildPoseMessage(smpl_window_);
+  }
+
+  if (!deploy_connected_) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                         "SMPL pose not sent: gear_sonic ZMQ connection not available.");
+    return;
+  }
+  zmq_sock_->send(zmq::buffer(pose_msg), zmq::send_flags::dontwait);
+}
+
+std::vector<uint8_t> GearSonicInterface::BuildPoseMessage(const std::deque<SmplFrame>& frames)
+{
+  const std::string n = std::to_string(frames.size());
+  // Field order MUST match the binary append order below (parser reads sequentially).
+  // shapes are row-major [N, ...]; matches pack_pose_message() (protocol v3).
+  const std::string fields = "[{\"name\":\"smpl_pose\",\"dtype\":\"f32\",\"shape\":[" + n +
+                             ",21,3]},"
+                             "{\"name\":\"smpl_joints\",\"dtype\":\"f32\",\"shape\":[" +
+                             n +
+                             ",24,3]},"
+                             "{\"name\":\"body_quat_w\",\"dtype\":\"f32\",\"shape\":[" +
+                             n +
+                             ",4]},"
+                             "{\"name\":\"joint_pos\",\"dtype\":\"f32\",\"shape\":[" +
+                             n +
+                             ",29]},"
+                             "{\"name\":\"joint_vel\",\"dtype\":\"f32\",\"shape\":[" +
+                             n +
+                             ",29]},"
+                             "{\"name\":\"frame_index\",\"dtype\":\"i64\",\"shape\":[" +
+                             n + "]}]";
+
+  auto append = [](std::vector<uint8_t>& v, const void* data, size_t nbytes) {
+    const auto* p = static_cast<const uint8_t*>(data);
+    v.insert(v.end(), p, p + nbytes);
+  };
+
+  std::vector<uint8_t> msg;
+  const std::string topic = "pose";
+  msg.insert(msg.end(), topic.begin(), topic.end());
+  const auto hdr = BuildZmqHeader(fields, /*version=*/3);
+  msg.insert(msg.end(), hdr.begin(), hdr.end());
+
+  // Little-endian binary payload (x86 is natively LE), frames outer (row-major [N, ...]).
+  for (const auto& f : frames) {
+    for (float v : f.smpl_pose) {
+      append(msg, &v, 4);
+    }
+  }
+  for (const auto& f : frames) {
+    for (float v : f.smpl_joints) {
+      append(msg, &v, 4);
+    }
+  }
+  for (const auto& f : frames) {
+    for (float v : f.body_quat_w) {
+      append(msg, &v, 4);
+    }
+  }
+  for (const auto& f : frames) {
+    for (float v : f.joint_pos) {
+      append(msg, &v, 4);
+    }
+  }
+  for (const auto& f : frames) {
+    for (float v : f.joint_vel) {
+      append(msg, &v, 4);
+    }
+  }
+  for (const auto& f : frames) {
+    const int64_t idx = f.frame_index;
+    append(msg, &idx, 8);
   }
   return msg;
 }
