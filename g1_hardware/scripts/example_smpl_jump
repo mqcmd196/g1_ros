@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+# Copyright 2026 Yoshiki Obinata
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Yoshiki Obinata nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+# Replay the bundled SMPL jump clip to GearSonicInterface in real time.
+#
+# This is a thin wrapper that locates the jump data shipped in this package's
+# share/data directory and hands it to replay_smpl_motion.py, which publishes the
+# motion frame-by-frame on <prefix>/smpl_motion at 50 Hz (GearSonicInterface then
+# forwards each frame to the SONIC deploy over ZMQ).
+#
+# Prerequisites:
+#   1. gear_sonic deploy running with: ./deploy.sh --input-type zmq_manager <sim|real>
+#   2. GearSonicInterface node running: ros2 run g1_hardware gear_sonic_interface_node
+#
+# Usage:
+#   ros2 run g1_hardware example_smpl_jump            # jump 1 (default)
+#   ros2 run g1_hardware example_smpl_jump 2          # jump 2
+#   ros2 run g1_hardware example_smpl_jump 3 -p rate:=50.0   # jump 3 + extra params
+#
+# The first positional argument selects the bundled clip (1/2/3, default 1).
+# Any remaining arguments are passed through to replay_smpl_motion.py.
+#
+# replay_smpl_motion.py handles the full sequence: enable_control (balance) ->
+# enable_smpl_stream (streamed motion) -> publish the jump -> enable_smpl_stream off.
+
+set -euo pipefail
+
+# First positional arg = jump number (1/2/3). Default 1. Only consumed if numeric,
+# so extra "-p ..." params can be passed without specifying a jump number.
+JUMP=1
+if [ "$#" -ge 1 ] && [[ "$1" =~ ^[0-9]+$ ]]; then
+  JUMP="$1"
+  shift
+fi
+
+PKG_SHARE="$(ros2 pkg prefix g1_hardware)/share/g1_hardware"
+CLIP="${PKG_SHARE}/data/smpl_jump${JUMP}.npz"
+
+if [ ! -f "${CLIP}" ]; then
+  echo "[example_smpl_jump] jump data not found: ${CLIP}" >&2
+  echo "[example_smpl_jump] available: $(ls "${PKG_SHARE}/data/" 2>/dev/null | tr '\n' ' ')" >&2
+  echo "[example_smpl_jump] did you build & source the workspace?" >&2
+  exit 1
+fi
+
+echo "[example_smpl_jump] replaying jump ${JUMP}: ${CLIP}"
+exec ros2 run g1_hardware replay_smpl_motion.py --ros-args -p clip:="${CLIP}" "$@"
