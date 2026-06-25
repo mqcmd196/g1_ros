@@ -6,14 +6,42 @@ on:
   pull_request:
     branches: [master]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
-  build_and_test:
-    runs-on: ubuntu-latest
+  ci:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            rosdep_skip_keys: catkin g1_description gazebo message_generation message_runtime roscpp roslaunch rviz unitree_sdk2
+          - runner: ubuntu-24.04-arm
+            rosdep_skip_keys: catkin g1_description gazebo message_generation message_runtime roscpp roslaunch rviz unitree_sdk2 moveit_ros_control_interface
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && matrix.runner == 'ubuntu-24.04-arm'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: ros-industrial/industrial_ci@master
         env:
           ROS_DISTRO: jazzy
           UPSTREAM_WORKSPACE: .github/upstream.jazzy.repos
           UPSTREAM_CMAKE_ARGS: --packages-select g1_description unitree_sdk2
-          ROSDEP_SKIP_KEYS: catkin g1_description gazebo message_generation message_runtime roscpp roslaunch rviz unitree_sdk2
+          ROSDEP_SKIP_KEYS: ${{ matrix.rosdep_skip_keys }}
+          DOCKER_COMMIT: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Push image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && matrix.runner == 'ubuntu-24.04-arm'
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
