@@ -7,7 +7,7 @@
         rt/inspire/state unitree_go::msg::dds_::MotorStates_
       RH56DFX DDS q values are normalized as 0.0 = closed, 1.0 = open.
     -->
-  <xacro:macro name="inspire_rh56dfx_ros2_control" params="name network_interface:='' command_topic:='rt/inspire/cmd' state_topic:='rt/inspire/state' state_timeout_sec:=3.0">
+  <xacro:macro name="inspire_rh56dfx_ros2_control" params="name network_interface:='' command_topic:='rt/inspire/cmd' state_topic:='rt/inspire/state' state_timeout_sec:=3.0 close_hand_on_deactivate:=true">
     <ros2_control name="${name}" type="system">
       <hardware>
         <plugin>g1_hardware/InspireRH56DFXHardwareInterface</plugin>
@@ -15,6 +15,7 @@
         <param name="command_topic">${command_topic}</param>
         <param name="state_topic">${state_topic}</param>
         <param name="state_timeout_sec">${state_timeout_sec}</param>
+        <param name="close_hand_on_deactivate">${close_hand_on_deactivate}</param>
       </hardware>
       <!-- Right RH56DFX hand - actuated joints only (URDF mimic joints excluded) -->
       <joint name="R_thumb_proximal_yaw_joint">

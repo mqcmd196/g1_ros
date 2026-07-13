@@ -32,8 +32,19 @@ Then launch the nodes.
 ```shell
 source <colcon workspace>/install/setup.bash
 ros2 launch g1_bringup g1_bringup.launch.py network_interface:=<network interface name>
-# If you want to move hands, run the following instead:
-# ros2 launch g1_bringup g1_bringup.launch.py network_interface:=<network interface name> hand_type:=inspire_dfq
+```
+
+If you want to move Inspire RH56DFX hands, run the following instead:
+
+```shell
+ros2 launch g1_bringup g1_bringup.launch.py network_interface:=<network interface name> hand_type:=inspire_dfq
+```
+
+By default, the hands close when their hardware interface is deactivated.
+To disable this behavior, run the following instead:
+
+```shell
+ros2 launch g1_bringup g1_bringup.launch.py network_interface:=<network interface name> hand_type:=inspire_dfq close_hand_on_deactivate:=false
 ```
 
 To activate ROS controller

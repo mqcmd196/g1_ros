@@ -35,6 +35,8 @@ spawns controllers, and adds move_group, RViz, and static virtual-joint TFs.
 Usage:
   ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0
   ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 use_rviz:=false
+  ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 hand_type:=inspire_dfq
+  ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 hand_type:=inspire_dfq close_hand_on_deactivate:=false
   # With the gear_sonic (SONIC) locomotion bridge (real robot: bind on all
   # interfaces so the on-robot deploy stack can connect; keep
   # upper_body_controller inactive while SONIC is in control):
@@ -95,6 +97,9 @@ def _launch_setup(context, *args, **kwargs):
     inspire_state_timeout_sec = LaunchConfiguration(
         "inspire_state_timeout_sec"
     ).perform(context)
+    close_hand_on_deactivate = LaunchConfiguration("close_hand_on_deactivate").perform(
+        context
+    )
     use_rviz = LaunchConfiguration("use_rviz").perform(context).lower()
     use_gear_sonic = LaunchConfiguration("use_gear_sonic").perform(context)
     zmq_host = LaunchConfiguration("zmq_host").perform(context)
@@ -118,6 +123,7 @@ def _launch_setup(context, *args, **kwargs):
                 "inspire_command_topic": inspire_command_topic,
                 "inspire_state_topic": inspire_state_topic,
                 "inspire_state_timeout_sec": inspire_state_timeout_sec,
+                "close_hand_on_deactivate": close_hand_on_deactivate,
             },
         )
         .robot_description_semantic(
@@ -143,6 +149,7 @@ def _launch_setup(context, *args, **kwargs):
             "inspire_command_topic": inspire_command_topic,
             "inspire_state_topic": inspire_state_topic,
             "inspire_state_timeout_sec": inspire_state_timeout_sec,
+            "close_hand_on_deactivate": close_hand_on_deactivate,
             "use_gear_sonic": use_gear_sonic,
             "zmq_host": zmq_host,
         }.items(),
@@ -212,6 +219,12 @@ def generate_launch_description():
                 "inspire_state_timeout_sec",
                 default_value="3.0",
                 description="Seconds to wait for the first RH56DFX state message",
+            ),
+            DeclareLaunchArgument(
+                "close_hand_on_deactivate",
+                default_value="true",
+                choices=["true", "false"],
+                description="Close RH56DFX hands when the hardware interface deactivates",
             ),
             DeclareLaunchArgument(
                 "use_rviz",

@@ -93,6 +93,9 @@ def _launch_setup(context, *args, **kwargs):
     inspire_state_timeout_sec = LaunchConfiguration(
         "inspire_state_timeout_sec"
     ).perform(context)
+    close_hand_on_deactivate = LaunchConfiguration("close_hand_on_deactivate").perform(
+        context
+    )
 
     g1_hw_share = Path(get_package_share_directory("g1_hardware"))
 
@@ -108,6 +111,7 @@ def _launch_setup(context, *args, **kwargs):
             "inspire_command_topic": inspire_command_topic,
             "inspire_state_topic": inspire_state_topic,
             "inspire_state_timeout_sec": inspire_state_timeout_sec,
+            "close_hand_on_deactivate": close_hand_on_deactivate,
         },
     ).toxml()
 
@@ -211,6 +215,12 @@ def generate_launch_description():
                 "inspire_state_timeout_sec",
                 default_value="3.0",
                 description="Seconds to wait for the first RH56DFX state message",
+            ),
+            DeclareLaunchArgument(
+                "close_hand_on_deactivate",
+                default_value="true",
+                choices=["true", "false"],
+                description="Close RH56DFX hands when the hardware interface deactivates",
             ),
             DeclareLaunchArgument(
                 "use_gear_sonic",
