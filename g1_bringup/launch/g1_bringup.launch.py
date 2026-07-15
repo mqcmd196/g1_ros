@@ -35,6 +35,11 @@ spawns controllers, and adds move_group, RViz, and static virtual-joint TFs.
 Usage:
   ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0
   ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 use_rviz:=false
+  # With the gear_sonic (SONIC) locomotion bridge (real robot: bind on all
+  # interfaces so the on-robot deploy stack can connect; keep
+  # upper_body_controller inactive while SONIC is in control):
+  ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 \
+      use_gear_sonic:=true zmq_host:=0.0.0.0
 """
 
 from pathlib import Path
@@ -91,6 +96,8 @@ def _launch_setup(context, *args, **kwargs):
         "inspire_state_timeout_sec"
     ).perform(context)
     use_rviz = LaunchConfiguration("use_rviz").perform(context).lower()
+    use_gear_sonic = LaunchConfiguration("use_gear_sonic").perform(context)
+    zmq_host = LaunchConfiguration("zmq_host").perform(context)
 
     cfg = _HARDWARE_CONFIG[hand_type]
 
@@ -136,6 +143,8 @@ def _launch_setup(context, *args, **kwargs):
             "inspire_command_topic": inspire_command_topic,
             "inspire_state_topic": inspire_state_topic,
             "inspire_state_timeout_sec": inspire_state_timeout_sec,
+            "use_gear_sonic": use_gear_sonic,
+            "zmq_host": zmq_host,
         }.items(),
     )
 
@@ -208,6 +217,21 @@ def generate_launch_description():
                 "use_rviz",
                 default_value="true",
                 description="Launch RViz with MoveIt plugin",
+            ),
+            DeclareLaunchArgument(
+                "use_gear_sonic",
+                default_value="false",
+                choices=["true", "false"],
+                description="Start the gear_sonic (SONIC) locomotion bridge",
+            ),
+            DeclareLaunchArgument(
+                "zmq_host",
+                default_value="127.0.0.1",
+                description=(
+                    "gear_sonic_interface XPUB bind address (only used with "
+                    "use_gear_sonic:=true). Default accepts the deploy stack on "
+                    "this machine only (sim); use 0.0.0.0 for the real robot"
+                ),
             ),
             OpaqueFunction(function=_launch_setup),
         ]

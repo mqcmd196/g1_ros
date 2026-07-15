@@ -34,12 +34,18 @@ Starts:
   - ros2_control_node        (talks to robot via DDS)
   - loco_cmd_adapter         (accepting locomotion mode, cmd_vel)
   - joint_state_broadcaster  (infrastructure: required for TF / RViz)
+  - gear_sonic_interface     (optional: SONIC deploy bridge, use_gear_sonic:=true)
 
 Application-specific controller spawning (upper_body_controller,
 hand controllers, etc.) is intentionally left to the bringup layer.
 
 Usage:
   ros2 launch g1_hardware hardware.launch.py network_interface:=eth0
+  # With the gear_sonic (SONIC) locomotion bridge:
+  #   zmq_host is the XPUB *bind* address. The default 127.0.0.1 only accepts
+  #   a deploy stack on the same machine (sim). For the real robot, expose it
+  #   with zmq_host:=0.0.0.0 so the on-robot deploy stack can connect.
+  ros2 launch g1_hardware hardware.launch.py network_interface:=lo use_gear_sonic:=true
 """
 
 from pathlib import Path
@@ -107,6 +113,39 @@ def _launch_setup(context, *args, **kwargs):
 
     controllers_yaml = str(g1_hw_share / f"config/{cfg['ros2_controllers']}")
 
+    composable_nodes = [
+        ComposableNode(
+            package="robot_state_publisher",
+            plugin="robot_state_publisher::RobotStatePublisher",
+            name="robot_state_publisher",
+            parameters=[{"robot_description": robot_description}],
+        ),
+        ComposableNode(
+            package="g1_hardware",
+            plugin="loco_cmd_adapter::LocoCmdAdapterNode",
+            name="loco_cmd_adapter",
+            parameters=[{"network_interface": network_interface}],
+        ),
+        ComposableNode(
+            package="g1_hardware",
+            plugin="g1_hardware::G1LivoxInterfaceNode",
+            name="g1_livox_interface",
+            parameters=[{"network_interface": network_interface}],
+        ),
+    ]
+
+    use_gear_sonic = LaunchConfiguration("use_gear_sonic").perform(context)
+    if use_gear_sonic.lower() == "true":
+        zmq_host = LaunchConfiguration("zmq_host").perform(context)
+        composable_nodes.append(
+            ComposableNode(
+                package="g1_hardware",
+                plugin="g1_hardware::GearSonicInterface",
+                name="gear_sonic_interface",
+                parameters=[{"zmq_host": zmq_host}],
+            )
+        )
+
     return [
         Node(
             package="controller_manager",
@@ -121,26 +160,7 @@ def _launch_setup(context, *args, **kwargs):
             namespace="",
             package="rclcpp_components",
             executable="component_container",
-            composable_node_descriptions=[
-                ComposableNode(
-                    package="robot_state_publisher",
-                    plugin="robot_state_publisher::RobotStatePublisher",
-                    name="robot_state_publisher",
-                    parameters=[{"robot_description": robot_description}],
-                ),
-                ComposableNode(
-                    package="g1_hardware",
-                    plugin="loco_cmd_adapter::LocoCmdAdapterNode",
-                    name="loco_cmd_adapter",
-                    parameters=[{"network_interface": network_interface}],
-                ),
-                ComposableNode(
-                    package="g1_hardware",
-                    plugin="g1_hardware::G1LivoxInterfaceNode",
-                    name="g1_livox_interface",
-                    parameters=[{"network_interface": network_interface}],
-                ),
-            ],
+            composable_node_descriptions=composable_nodes,
         ),
         Node(
             package="controller_manager",
@@ -191,6 +211,20 @@ def generate_launch_description():
                 "inspire_state_timeout_sec",
                 default_value="3.0",
                 description="Seconds to wait for the first RH56DFX state message",
+            ),
+            DeclareLaunchArgument(
+                "use_gear_sonic",
+                default_value="false",
+                choices=["true", "false"],
+                description="Start the gear_sonic (SONIC) locomotion bridge",
+            ),
+            DeclareLaunchArgument(
+                "zmq_host",
+                default_value="127.0.0.1",
+                description=(
+                    "gear_sonic_interface XPUB bind address (only used with "
+                    "use_gear_sonic:=true)."
+                ),
             ),
             OpaqueFunction(function=_launch_setup),
         ]
