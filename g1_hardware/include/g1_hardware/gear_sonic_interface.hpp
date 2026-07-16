@@ -88,8 +88,18 @@ namespace g1_hardware
  *       VR 3-point upper-body targets (link names from G1 URDF).
  *       Sending any one topic enables VR tracking; unpublished endpoints
  *       hold their default values (natural standing pose FK result).
- *       vr_3point_body_offset (from motion.yaml) is NOT applied here —
- *       the caller is responsible for the offset if exact joint control is needed.
+ *       With apply_vr_3point_body_offset (default true) the incoming poses are
+ *       interpreted as URDF *link* poses and converted to the policy keypoints
+ *       by adding vr_3point_body_offset (gear_sonic motion.yaml) rotated by the
+ *       commanded orientation:
+ *         left wrist:  pos + R(q) * ( 0.18, -0.025, 0.0 )
+ *         right wrist: pos + R(q) * ( 0.18, +0.025, 0.0 )
+ *         torso/head:  pos + R(q) * ( 0.0,   0.0,   0.35 )
+ *       Set the parameter to false to send raw keypoint targets yourself.
+ *       If no pose message arrives within pose_timeout, vr fields are dropped
+ *       from planner messages (deploy releases VR tracking and reverts to the
+ *       planner reference motion) — same semantics as pico_manager when the
+ *       VR stream stops.
  *
  * ── Coordinate frame for PoseStamped positions ────────────────────────────
  *   Positions must be in the G1's "pelvis" TF frame (URDF root link).
@@ -104,6 +114,14 @@ namespace g1_hardware
  *   zmq_port        (int,    default 5556)
  *   publish_rate    (double, default 50.0 Hz)
  *   cmd_vel_timeout (double, default 0.5 s) — cmd_vel zeroed if no message within this window
+ *   pose_timeout    (double, default 0.5 s) — vr fields dropped from planner messages if no
+ *                   pose target arrives within this window (<= 0 keeps the last targets forever)
+ *   vr_compliance   (double[3], default {0, 0, 0}) — end-effector tracking compliance
+ *                   [left wrist, right wrist, head]; 0 = stiff (exact tracking).
+ *                   NOTE: the deploy-side default when this field is NOT sent is
+ *                   {0.5, 0.5, 0.0} (compliant wrists). We default to stiff so that
+ *                   commanded end-effector poses are reproduced accurately.
+ *   apply_vr_3point_body_offset (bool, default true) — see the topic section above
  *
  * gear_sonic launch (on robot):
  *   Execute gear_sonic's ./deploy.sh and ensure the ZMQ connection is available:
@@ -132,12 +150,17 @@ private:
   // ZMQ wire-format builders (replicates gear_sonic/utils/teleop/zmq/zmq_planner_sender.py)
   static std::vector<uint8_t> BuildZmqHeader(const std::string& fields_json, int version = 1);
   static std::vector<uint8_t> BuildCommandMessage(bool start, bool stop, bool planner);
-  // vr_position and vr_orientation are optional (nullptr = field omitted).
-  // This matches PLANNER_VR_3PT where both are None until VR data arrives.
+  // vr_position, vr_orientation and vr_compliance are optional (nullptr = field omitted).
+  // This matches PLANNER_VR_3PT where they are None until VR data arrives.
   static std::vector<uint8_t>
   BuildPlannerMessage(int mode, std::array<float, 3> movement, std::array<float, 3> facing,
                       float speed, float height, const std::array<float, 9>* vr_position = nullptr,
-                      const std::array<float, 12>* vr_orientation = nullptr);
+                      const std::array<float, 12>* vr_orientation = nullptr,
+                      const std::array<float, 3>* vr_compliance = nullptr);
+
+  // Store one endpoint pose (idx: 0 = left wrist, 1 = right wrist, 2 = head/torso)
+  // into vr_position_/vr_orientation_, applying the body offset if enabled.
+  void StoreTargetPose(size_t idx, const geometry_msgs::msg::PoseStamped& msg);
 
   // One buffered frame of processed SMPL motion (deploy "pose"/streamed-motion stream).
   struct SmplFrame
@@ -182,19 +205,34 @@ private:
   // vr_position: [Lw_x,y,z, Rw_x,y,z, H_x,y,z]  (pelvis frame)
   // Default values from gear_sonic_deploy zmq_endpoint_interface.hpp
   // (InputInterface defaults, natural standing pose FK result).
-  std::array<float, 9> vr_position_{
+  static constexpr std::array<float, 9> kDefaultVrPosition{
       0.0903f, 0.1615f,  -0.2411f, // left  wrist
       0.1280f, -0.1522f, -0.2461f, // right wrist
       0.0241f, -0.0081f, 0.4028f,  // head
   };
   // vr_orientation: [Lw_qw,qx,qy,qz, Rw_qw,qx,qy,qz, H_qw,qx,qy,qz]
   // Default values from same source.
-  std::array<float, 12> vr_orientation_{
+  static constexpr std::array<float, 12> kDefaultVrOrientation{
       0.7295f, 0.3145f,  0.5533f, -0.2506f, // left
       0.7320f, -0.2639f, 0.5395f, 0.3217f,  // right
       0.9991f, 0.011f,   0.0402f, -0.0002f, // head
   };
-  bool any_pose_received_{false}; // true once at least one pose topic arrives
+  // Keypoint offsets in the target link's local frame, from gear_sonic
+  // config/manager_env/commands/terms/motion.yaml `vr_3point_body_offset`
+  // (also mirrored in g1_deploy_onnx_ref.cpp VR_3POINT_OFFSETS). The policy
+  // tracks link_pos + R(link_quat) * offset, NOT the link origin itself.
+  static constexpr std::array<std::array<float, 3>, 3> kVr3PointBodyOffset{{
+      {0.18f, -0.025f, 0.0f}, // left wrist
+      {0.18f, +0.025f, 0.0f}, // right wrist
+      {0.0f, 0.0f, 0.35f},    // head (offset from torso link)
+  }};
+  std::array<float, 9> vr_position_{kDefaultVrPosition};
+  std::array<float, 12> vr_orientation_{kDefaultVrOrientation};
+  std::array<float, 3> vr_compliance_{0.0f, 0.0f, 0.0f}; // set from parameter in ctor
+  bool apply_body_offset_{true};                         // set from parameter in ctor
+  bool any_pose_received_{false};                   // true once at least one pose topic arrives
+  rclcpp::Time last_pose_time_{0, 0, RCL_ROS_TIME}; // last pose target receive time
+  double pose_timeout_{0.5}; // seconds; vr fields dropped if no pose within this window
 
   bool control_active_{false};
 

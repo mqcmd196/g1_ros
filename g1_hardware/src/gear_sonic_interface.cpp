@@ -30,6 +30,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <stdexcept>
 
 #include <rclcpp_components/register_node_macro.hpp>
 
@@ -66,7 +67,19 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   const int zmq_port = declare_parameter("zmq_port", 5556);
   const double publish_rate = declare_parameter("publish_rate", 50.0);
   cmd_vel_timeout_ = declare_parameter("cmd_vel_timeout", 0.5);
+  pose_timeout_ = declare_parameter("pose_timeout", 0.5);
   smpl_window_size_ = static_cast<size_t>(declare_parameter("smpl_window_size", 5));
+  apply_body_offset_ = declare_parameter("apply_vr_3point_body_offset", true);
+  // End-effector tracking compliance [left wrist, right wrist, head]; 0 = stiff.
+  // Deploy-side default when the field is not sent is {0.5, 0.5, 0.0} (compliant
+  // wrists) — we default to stiff so commanded poses are reproduced accurately.
+  const auto compliance = declare_parameter("vr_compliance", std::vector<double>{0.0, 0.0, 0.0});
+  if (compliance.size() != 3) {
+    throw std::invalid_argument("vr_compliance must have exactly 3 elements");
+  }
+  for (size_t i = 0; i < 3; ++i) {
+    vr_compliance_[i] = static_cast<float>(compliance[i]);
+  }
   publish_dt_ = 1.0 / publish_rate;
 
   // ZMQ: bind XPUB socket so the deploy stack SUB can connect to us.
@@ -237,43 +250,53 @@ void GearSonicInterface::OnCmdVel(geometry_msgs::msg::Twist::ConstSharedPtr msg)
 //   SONIC vr_orientation: (w, x, y, z) ← reordered in each callback below
 // ──────────────────────────────────────────────
 
+void GearSonicInterface::StoreTargetPose(size_t idx, const geometry_msgs::msg::PoseStamped& msg)
+{
+  const float qw = static_cast<float>(msg.pose.orientation.w);
+  const float qx = static_cast<float>(msg.pose.orientation.x);
+  const float qy = static_cast<float>(msg.pose.orientation.y);
+  const float qz = static_cast<float>(msg.pose.orientation.z);
+  float px = static_cast<float>(msg.pose.position.x);
+  float py = static_cast<float>(msg.pose.position.y);
+  float pz = static_cast<float>(msg.pose.position.z);
+
+  if (apply_body_offset_) {
+    // Convert the link pose to the policy keypoint: pos + R(quat) * offset.
+    // R * v via quaternion: v + 2*qv x (qv x v + qw*v)
+    const auto& o = kVr3PointBodyOffset[idx];
+    const float tx = 2.0f * (qy * o[2] - qz * o[1]);
+    const float ty = 2.0f * (qz * o[0] - qx * o[2]);
+    const float tz = 2.0f * (qx * o[1] - qy * o[0]);
+    px += o[0] + qw * tx + qy * tz - qz * ty;
+    py += o[1] + qw * ty + qz * tx - qx * tz;
+    pz += o[2] + qw * tz + qx * ty - qy * tx;
+  }
+
+  std::lock_guard<std::mutex> lock(data_mutex_);
+  vr_position_[idx * 3 + 0] = px;
+  vr_position_[idx * 3 + 1] = py;
+  vr_position_[idx * 3 + 2] = pz;
+  vr_orientation_[idx * 4 + 0] = qw;
+  vr_orientation_[idx * 4 + 1] = qx;
+  vr_orientation_[idx * 4 + 2] = qy;
+  vr_orientation_[idx * 4 + 3] = qz;
+  any_pose_received_ = true;
+  last_pose_time_ = now();
+}
+
 void GearSonicInterface::OnLeftWrist(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(data_mutex_);
-  vr_position_[0] = static_cast<float>(msg->pose.position.x);
-  vr_position_[1] = static_cast<float>(msg->pose.position.y);
-  vr_position_[2] = static_cast<float>(msg->pose.position.z);
-  vr_orientation_[0] = static_cast<float>(msg->pose.orientation.w);
-  vr_orientation_[1] = static_cast<float>(msg->pose.orientation.x);
-  vr_orientation_[2] = static_cast<float>(msg->pose.orientation.y);
-  vr_orientation_[3] = static_cast<float>(msg->pose.orientation.z);
-  any_pose_received_ = true;
+  StoreTargetPose(0, *msg);
 }
 
 void GearSonicInterface::OnRightWrist(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(data_mutex_);
-  vr_position_[3] = static_cast<float>(msg->pose.position.x);
-  vr_position_[4] = static_cast<float>(msg->pose.position.y);
-  vr_position_[5] = static_cast<float>(msg->pose.position.z);
-  vr_orientation_[4] = static_cast<float>(msg->pose.orientation.w);
-  vr_orientation_[5] = static_cast<float>(msg->pose.orientation.x);
-  vr_orientation_[6] = static_cast<float>(msg->pose.orientation.y);
-  vr_orientation_[7] = static_cast<float>(msg->pose.orientation.z);
-  any_pose_received_ = true;
+  StoreTargetPose(1, *msg);
 }
 
 void GearSonicInterface::OnHead(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(data_mutex_);
-  vr_position_[6] = static_cast<float>(msg->pose.position.x);
-  vr_position_[7] = static_cast<float>(msg->pose.position.y);
-  vr_position_[8] = static_cast<float>(msg->pose.position.z);
-  vr_orientation_[8] = static_cast<float>(msg->pose.orientation.w);
-  vr_orientation_[9] = static_cast<float>(msg->pose.orientation.x);
-  vr_orientation_[10] = static_cast<float>(msg->pose.orientation.y);
-  vr_orientation_[11] = static_cast<float>(msg->pose.orientation.z);
-  any_pose_received_ = true;
+  StoreTargetPose(2, *msg);
 }
 
 void GearSonicInterface::TimerCallback()
@@ -313,6 +336,23 @@ void GearSonicInterface::TimerCallback()
   }
 
   std::lock_guard<std::mutex> lock(data_mutex_);
+
+  // ── Pose target timeout ────────────────────────────────────────────────
+  // Mirror pico_manager: when the VR pose stream stops, vr fields are no longer
+  // sent, the deploy sets has_vr_3point_control_ = false and reverts to the
+  // planner reference motion. Without this, the last target would be latched
+  // forever and leak into later sessions.
+  if (any_pose_received_ && pose_timeout_ > 0.0 &&
+      (now() - last_pose_time_).seconds() > pose_timeout_)
+  {
+    any_pose_received_ = false;
+    vr_position_ = kDefaultVrPosition;
+    vr_orientation_ = kDefaultVrOrientation;
+    RCLCPP_INFO(get_logger(),
+                "No pose target for %.2f s: VR 3-point tracking released "
+                "(deploy reverts to the planner reference motion).",
+                pose_timeout_);
+  }
 
   // ── Locomotion: convert cmd_vel (body frame) to movement/facing (world frame) ──
   //
@@ -431,7 +471,7 @@ void GearSonicInterface::TimerCallback()
   std::vector<uint8_t> msg;
   if (any_pose_received_) {
     msg = BuildPlannerMessage(active_mode, movement, facing, speed, /*height=*/-1.0f, &vr_position_,
-                              &vr_orientation_);
+                              &vr_orientation_, &vr_compliance_);
   } else {
     msg = BuildPlannerMessage(active_mode, movement, facing, speed, /*height=*/-1.0f);
   }
@@ -474,7 +514,8 @@ std::vector<uint8_t> GearSonicInterface::BuildCommandMessage(bool start, bool st
 
 std::vector<uint8_t> GearSonicInterface::BuildPlannerMessage(
     int mode, std::array<float, 3> movement, std::array<float, 3> facing, float speed, float height,
-    const std::array<float, 9>* vr_position, const std::array<float, 12>* vr_orientation)
+    const std::array<float, 9>* vr_position, const std::array<float, 12>* vr_orientation,
+    const std::array<float, 3>* vr_compliance)
 {
   std::string fields = "[{\"name\":\"mode\",\"dtype\":\"i32\",\"shape\":[1]},"
                        "{\"name\":\"movement\",\"dtype\":\"f32\",\"shape\":[3]},"
@@ -486,6 +527,9 @@ std::vector<uint8_t> GearSonicInterface::BuildPlannerMessage(
   }
   if (vr_orientation) {
     fields += ",{\"name\":\"vr_orientation\",\"dtype\":\"f32\",\"shape\":[12]}";
+  }
+  if (vr_compliance) {
+    fields += ",{\"name\":\"vr_compliance\",\"dtype\":\"f32\",\"shape\":[3]}";
   }
   fields += "]";
 
@@ -517,6 +561,11 @@ std::vector<uint8_t> GearSonicInterface::BuildPlannerMessage(
   }
   if (vr_orientation) {
     for (float v : *vr_orientation) {
+      append(msg, &v, 4);
+    }
+  }
+  if (vr_compliance) {
+    for (float v : *vr_compliance) {
       append(msg, &v, 4);
     }
   }
