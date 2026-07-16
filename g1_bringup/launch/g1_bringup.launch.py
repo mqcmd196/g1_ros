@@ -110,7 +110,7 @@ def _launch_setup(context, *args, **kwargs):
     g1_moveit_share = Path(get_package_share_directory("g1_moveit_config"))
 
     # Build moveit_config for MoveIt nodes (RSP is handled by hardware launch)
-    moveit_config = (
+    moveit_config_builder = (
         MoveItConfigsBuilder("g1_29dof", package_name="g1_moveit_config")
         .robot_description(
             file_path=str(g1_hw_share / f"config/{cfg['urdf_xacro']}"),
@@ -133,8 +133,16 @@ def _launch_setup(context, *args, **kwargs):
             pipelines=["ompl"],
             default_planning_pipeline="ompl",
         )
-        .to_moveit_configs()
     )
+    if use_gear_sonic.lower() == "true":
+        # Execute trajectories through the gear_sonic FK adapter instead of the
+        # ros2_control upper_body_controller (which conflicts with SONIC).
+        moveit_config_builder = moveit_config_builder.trajectory_execution(
+            file_path=str(
+                g1_moveit_share / "config/moveit_controllers_gear_sonic.yaml"
+            ),
+        )
+    moveit_config = moveit_config_builder.to_moveit_configs()
 
     # Hardware driver (RSP + ros2_control_node + spawners)
     hw_launch = IncludeLaunchDescription(

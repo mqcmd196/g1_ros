@@ -1,0 +1,35 @@
+# MoveIt controller config for gear_sonic (SONIC) whole-body control.
+#
+# Instead of the ros2_control upper_body_controller (rt/arm_sdk, conflicts with
+# the SONIC policy), trajectories are executed by the
+# gear_sonic_controller node (g1_hardware), which converts them to
+# VR 3-point end-effector targets via FK. Only the wrist/torso poses are
+# reproduced — the RL policy may realise different joint angles.
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+moveit_simple_controller_manager:
+  controller_names:
+    - gear_sonic_controller
+
+  gear_sonic_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints:
+      - waist_yaw_joint
+      - waist_roll_joint
+      - waist_pitch_joint
+      - left_shoulder_pitch_joint
+      - left_shoulder_roll_joint
+      - left_shoulder_yaw_joint
+      - left_elbow_joint
+      - left_wrist_roll_joint
+      - left_wrist_pitch_joint
+      - left_wrist_yaw_joint
+      - right_shoulder_pitch_joint
+      - right_shoulder_roll_joint
+      - right_shoulder_yaw_joint
+      - right_elbow_joint
+      - right_wrist_roll_joint
+      - right_wrist_pitch_joint
+      - right_wrist_yaw_joint

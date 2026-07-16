@@ -149,6 +149,14 @@ def _launch_setup(context, *args, **kwargs):
                 parameters=[{"zmq_host": zmq_host}],
             )
         )
+        # FollowJointTrajectory -> VR 3-point adapter (MoveIt-compatible)
+        composable_nodes.append(
+            ComposableNode(
+                package="g1_hardware",
+                plugin="g1_hardware::GearSonicController",
+                name="gear_sonic_controller",
+            )
+        )
 
     return [
         Node(
