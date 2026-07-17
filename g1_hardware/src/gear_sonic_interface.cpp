@@ -130,6 +130,17 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   cmd_vel_sub_ = create_subscription<geometry_msgs::msg::Twist>(
       "~/cmd_vel", 1, [this](geometry_msgs::msg::Twist::ConstSharedPtr msg) { OnCmdVel(msg); });
 
+  // Desired base height (m); forwarded as the planner `height` field.
+  // Standing default is 0.789 m (kplanner config default_height); -1 = mode default.
+  target_height_sub_ = create_subscription<std_msgs::msg::Float64>(
+      "~/target_height", 1, [this](std_msgs::msg::Float64::ConstSharedPtr msg) {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        if (msg->data != target_height_) {
+          RCLCPP_INFO(get_logger(), "Target base height → %.3f m", msg->data);
+        }
+        target_height_ = msg->data;
+      });
+
   left_wrist_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
       "~/target_left_wrist_yaw_link", 1,
       [this](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) { OnLeftWrist(msg); });
@@ -468,12 +479,13 @@ void GearSonicInterface::TimerCallback()
   // Include vr_position/vr_orientation as soon as ANY pose topic has been received.
   // Endpoints that have not been published yet keep their default values (set in the
   // header: natural standing pose in pelvis frame), so a single-topic publisher works.
+  const float height = static_cast<float>(target_height_);
   std::vector<uint8_t> msg;
   if (any_pose_received_) {
-    msg = BuildPlannerMessage(active_mode, movement, facing, speed, /*height=*/-1.0f, &vr_position_,
+    msg = BuildPlannerMessage(active_mode, movement, facing, speed, height, &vr_position_,
                               &vr_orientation_, &vr_compliance_);
   } else {
-    msg = BuildPlannerMessage(active_mode, movement, facing, speed, /*height=*/-1.0f);
+    msg = BuildPlannerMessage(active_mode, movement, facing, speed, height);
   }
   zmq_sock_->send(zmq::buffer(msg), zmq::send_flags::dontwait);
 }

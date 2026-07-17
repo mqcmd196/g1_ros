@@ -64,12 +64,12 @@ class ExampleSonicPoseNode(Node):
         # Positions in the G1 "pelvis" frame (robot body frame, origin at pelvis).
         # Adjust these values to test different poses.
         self.pub_left.publish(
-            self._make_pose(x=0.3, y=0.3, z=0.0)
+            self._make_pose(x=0.0, y=0.2, z=0.0)
         )  # left_wrist_yaw_link
         self.pub_right.publish(
-            self._make_pose(x=0.3, y=-0.3, z=0.0)
+            self._make_pose(x=0.0, y=-0.2, z=0.0)
         )  # right_wrist_yaw_link
-        self.pub_torso.publish(self._make_pose(x=0.0, y=0.0, z=0.5))  # torso_link
+        self.pub_torso.publish(self._make_pose(x=0.0, y=0.0, z=0.0))  # torso_link
 
 
 def main(args=None):
