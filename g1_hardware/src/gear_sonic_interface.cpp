@@ -30,7 +30,6 @@
 
 #include <chrono>
 #include <cstring>
-#include <stdexcept>
 
 #include <rclcpp_components/register_node_macro.hpp>
 
@@ -70,16 +69,13 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   pose_timeout_ = declare_parameter("pose_timeout", 0.5);
   smpl_window_size_ = static_cast<size_t>(declare_parameter("smpl_window_size", 5));
   apply_body_offset_ = declare_parameter("apply_vr_3point_body_offset", true);
-  // End-effector tracking compliance [left wrist, right wrist, head]; 0 = stiff.
-  // Deploy-side default when the field is not sent is {0.5, 0.5, 0.0} (compliant
-  // wrists) — we default to stiff so commanded poses are reproduced accurately.
-  const auto compliance = declare_parameter("vr_compliance", std::vector<double>{0.0, 0.0, 0.0});
-  if (compliance.size() != 3) {
-    throw std::invalid_argument("vr_compliance must have exactly 3 elements");
-  }
-  for (size_t i = 0; i < 3; ++i) {
-    vr_compliance_[i] = static_cast<float>(compliance[i]);
-  }
+  // End-effector tracking compliance per keypoint, each 0.0-1.0; 0 = stiff.
+  // Sent as the SONIC planner `vr_compliance` field. The deploy-side default
+  // when the field is not sent is {0.5, 0.5, 0.0} (compliant wrists) — we
+  // default to stiff so commanded poses are reproduced accurately.
+  vr_compliance_[0] = static_cast<float>(declare_parameter("left_wrist_compliance", 0.0));
+  vr_compliance_[1] = static_cast<float>(declare_parameter("right_wrist_compliance", 0.0));
+  vr_compliance_[2] = static_cast<float>(declare_parameter("head_compliance", 0.0));
   publish_dt_ = 1.0 / publish_rate;
 
   // ZMQ: bind XPUB socket so the deploy stack SUB can connect to us.

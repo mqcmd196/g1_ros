@@ -103,6 +103,13 @@ def _launch_setup(context, *args, **kwargs):
     use_rviz = LaunchConfiguration("use_rviz").perform(context).lower()
     use_gear_sonic = LaunchConfiguration("use_gear_sonic").perform(context)
     zmq_host = LaunchConfiguration("zmq_host").perform(context)
+    left_wrist_compliance = LaunchConfiguration("left_wrist_compliance").perform(
+        context
+    )
+    right_wrist_compliance = LaunchConfiguration("right_wrist_compliance").perform(
+        context
+    )
+    head_compliance = LaunchConfiguration("head_compliance").perform(context)
 
     cfg = _HARDWARE_CONFIG[hand_type]
 
@@ -173,6 +180,9 @@ def _launch_setup(context, *args, **kwargs):
             # /robot_description topic) crashes on the unknown lift joint.
             "use_gear_sonic": use_gear_sonic,
             "zmq_host": zmq_host,
+            "left_wrist_compliance": left_wrist_compliance,
+            "right_wrist_compliance": right_wrist_compliance,
+            "head_compliance": head_compliance,
         }.items(),
     )
 
@@ -265,6 +275,30 @@ def generate_launch_description():
                     "gear_sonic_interface XPUB bind address (only used with "
                     "use_gear_sonic:=true). Default accepts the deploy stack on "
                     "this machine only (sim); use 0.0.0.0 for the real robot"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "left_wrist_compliance",
+                default_value="0.0",
+                description=(
+                    "SONIC left wrist tracking compliance, 0.0-1.0; 0.0 = stiff "
+                    "(exact tracking). Only used with use_gear_sonic:=true."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "right_wrist_compliance",
+                default_value="0.0",
+                description=(
+                    "SONIC right wrist tracking compliance, 0.0-1.0; 0.0 = stiff "
+                    "(exact tracking). Only used with use_gear_sonic:=true."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "head_compliance",
+                default_value="0.0",
+                description=(
+                    "SONIC head tracking compliance, 0.0-1.0; 0.0 = stiff "
+                    "(exact tracking). Only used with use_gear_sonic:=true."
                 ),
             ),
             OpaqueFunction(function=_launch_setup),

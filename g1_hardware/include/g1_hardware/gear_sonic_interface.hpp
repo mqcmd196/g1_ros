@@ -123,11 +123,15 @@ namespace g1_hardware
  *   cmd_vel_timeout (double, default 0.5 s) — cmd_vel zeroed if no message within this window
  *   pose_timeout    (double, default 0.5 s) — vr fields dropped from planner messages if no
  *                   pose target arrives within this window (<= 0 keeps the last targets forever)
- *   vr_compliance   (double[3], default {0, 0, 0}) — end-effector tracking compliance
- *                   [left wrist, right wrist, head]; 0 = stiff (exact tracking).
- *                   NOTE: the deploy-side default when this field is NOT sent is
- *                   {0.5, 0.5, 0.0} (compliant wrists). We default to stiff so that
- *                   commanded end-effector poses are reproduced accurately.
+ *   left_wrist_compliance  (double, default 0.0)
+ *   right_wrist_compliance (double, default 0.0)
+ *   head_compliance        (double, default 0.0)
+ *                   End-effector tracking compliance, each 0.0-1.0; 0 = stiff
+ *                   (exact tracking). Sent as the SONIC planner `vr_compliance`
+ *                   field. NOTE: the deploy-side default when the field is NOT
+ *                   sent is {0.5, 0.5, 0.0} (compliant wrists). We default to
+ *                   stiff so commanded end-effector poses are reproduced
+ *                   accurately.
  *   apply_vr_3point_body_offset (bool, default true) — see the topic section above
  *
  * gear_sonic launch (on robot):
