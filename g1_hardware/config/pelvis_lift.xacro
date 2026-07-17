@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+      Virtual prismatic DOF for MoveIt whole-body (squat) planning with gear_sonic.
+
+      Inserts a massless root link `pelvis_lift_base` above `pelvis` connected by
+      `pelvis_height_joint` (z axis). The joint does NOT exist on the robot: it is
+      planned by MoveIt and mapped by gear_sonic_controller to the SONIC planner
+      `height` command (base height = 0.789 m + joint value), which makes the
+      RL policy squat. Leg motion is realised by the policy, not by this model.
+    -->
+  <xacro:macro name="pelvis_lift">
+    <link name="pelvis_lift_base"/>
+    <joint name="pelvis_height_joint" type="prismatic">
+      <parent link="pelvis_lift_base"/>
+      <child link="pelvis"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <!-- 0 = standing (base height 0.789 m); -0.389 = deepest squat (0.4 m) -->
+      <limit lower="-0.389" upper="0.0" effort="1000.0" velocity="0.4"/>
+    </joint>
+  </xacro:macro>
+</robot>

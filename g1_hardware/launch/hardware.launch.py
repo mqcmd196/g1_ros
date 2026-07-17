@@ -82,6 +82,11 @@ def _launch_setup(context, *args, **kwargs):
     cfg = _HARDWARE_CONFIG[hand_type]
 
     network_interface = LaunchConfiguration("network_interface").perform(context)
+    use_gear_sonic = LaunchConfiguration("use_gear_sonic").perform(context).lower()
+    # With gear_sonic the URDF gains the virtual pelvis_height_joint so that
+    # MoveIt (and RViz, which reads /robot_description) can plan squatting.
+    # ros2_control ignores the extra passive joint.
+    use_pelvis_lift = "true" if use_gear_sonic == "true" else "false"
     kp = LaunchConfiguration("kp").perform(context)
     kd = LaunchConfiguration("kd").perform(context)
     waist_kp = LaunchConfiguration("waist_kp").perform(context)
@@ -112,6 +117,7 @@ def _launch_setup(context, *args, **kwargs):
             "inspire_state_topic": inspire_state_topic,
             "inspire_state_timeout_sec": inspire_state_timeout_sec,
             "close_hand_on_deactivate": close_hand_on_deactivate,
+            "use_pelvis_lift": use_pelvis_lift,
         },
     ).toxml()
 
@@ -138,8 +144,7 @@ def _launch_setup(context, *args, **kwargs):
         ),
     ]
 
-    use_gear_sonic = LaunchConfiguration("use_gear_sonic").perform(context)
-    if use_gear_sonic.lower() == "true":
+    if use_gear_sonic == "true":
         zmq_host = LaunchConfiguration("zmq_host").perform(context)
         composable_nodes.append(
             ComposableNode(

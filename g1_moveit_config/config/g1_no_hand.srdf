@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<robot name="g1_29dof">
+<robot name="g1_29dof" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- use_pelvis_lift: include the virtual pelvis_height_joint (gear_sonic squat
+         planning). The URDF must be generated with the same arg. -->
+    <xacro:arg name="use_pelvis_lift" default="false"/>
+    <xacro:property name="waist_chain_base" value="${'pelvis_lift_base' if '$(arg use_pelvis_lift)' == 'true' else 'pelvis'}"/>
 
     <group name="right_arm">
         <joint name="right_shoulder_pitch_joint"/>
@@ -22,14 +26,17 @@
     </group>
 
     <group name="left_arm_with_waist">
-        <chain base_link="pelvis" tip_link="left_wrist_yaw_link"/>
+        <chain base_link="${waist_chain_base}" tip_link="left_wrist_yaw_link"/>
     </group>
 
     <group name="right_arm_with_waist">
-        <chain base_link="pelvis" tip_link="right_wrist_yaw_link"/>
+        <chain base_link="${waist_chain_base}" tip_link="right_wrist_yaw_link"/>
     </group>
 
     <group name="both_arms_with_waist">
+        <xacro:if value="$(arg use_pelvis_lift)">
+            <joint name="pelvis_height_joint"/>
+        </xacro:if>
         <joint name="waist_yaw_joint"/>
         <joint name="waist_roll_joint"/>
         <joint name="waist_pitch_joint"/>
@@ -69,7 +76,12 @@
         <joint name="left_wrist_yaw_joint" value="0"/>
     </group_state>
 
-    <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="pelvis"/>
+    <xacro:if value="$(arg use_pelvis_lift)">
+        <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="pelvis_lift_base"/>
+    </xacro:if>
+    <xacro:unless value="$(arg use_pelvis_lift)">
+        <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="pelvis"/>
+    </xacro:unless>
 
     <!-- Pelvis -->
     <disable_collisions link1="pelvis" link2="pelvis_contour_link" reason="Adjacent"/>

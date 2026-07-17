@@ -109,6 +109,12 @@ def _launch_setup(context, *args, **kwargs):
     g1_hw_share = Path(get_package_share_directory("g1_hardware"))
     g1_moveit_share = Path(get_package_share_directory("g1_moveit_config"))
 
+    # With gear_sonic, MoveIt plans with the virtual pelvis_height_joint so that
+    # low targets are reachable by squatting (gear_sonic_controller maps the
+    # joint to the SONIC base-height command). The hardware-side URDF (RSP,
+    # ros2_control) stays lift-free — only MoveIt's model differs.
+    use_pelvis_lift = "true" if use_gear_sonic.lower() == "true" else "false"
+
     # Build moveit_config for MoveIt nodes (RSP is handled by hardware launch)
     moveit_config_builder = (
         MoveItConfigsBuilder("g1_29dof", package_name="g1_moveit_config")
@@ -124,10 +130,12 @@ def _launch_setup(context, *args, **kwargs):
                 "inspire_state_topic": inspire_state_topic,
                 "inspire_state_timeout_sec": inspire_state_timeout_sec,
                 "close_hand_on_deactivate": close_hand_on_deactivate,
+                "use_pelvis_lift": use_pelvis_lift,
             },
         )
         .robot_description_semantic(
             file_path=str(g1_moveit_share / f"config/{cfg['srdf']}"),
+            mappings={"use_pelvis_lift": use_pelvis_lift},
         )
         .planning_pipelines(
             pipelines=["ompl"],
@@ -158,6 +166,11 @@ def _launch_setup(context, *args, **kwargs):
             "inspire_state_topic": inspire_state_topic,
             "inspire_state_timeout_sec": inspire_state_timeout_sec,
             "close_hand_on_deactivate": close_hand_on_deactivate,
+            # use_gear_sonic also makes hardware.launch.py build the URDF with
+            # the virtual pelvis_height_joint, so RSP publishes the same
+            # (lift-including) model as MoveIt uses — otherwise RViz's
+            # MotionPlanning display (which falls back to the
+            # /robot_description topic) crashes on the unknown lift joint.
             "use_gear_sonic": use_gear_sonic,
             "zmq_host": zmq_host,
         }.items(),

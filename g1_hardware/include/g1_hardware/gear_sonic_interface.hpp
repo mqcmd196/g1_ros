@@ -40,6 +40,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <zmq.hpp>
@@ -81,6 +82,12 @@ namespace g1_hardware
  *       linear.y  → strafe speed   (m/s, robot body frame, positive = left)
  *       angular.z → turn rate      (rad/s); accumulated into heading angle
  *       speed is always -1 (auto) as per SONIC's default
+ *
+ *   ~/target_height (std_msgs/Float64, subscribe)
+ *       Desired base height in meters, sent as the planner `height` field
+ *       (standing default is 0.789 m; lower values make the policy crouch).
+ *       -1.0 = mode default (initial state). The last received value is
+ *       latched until a new one arrives.
  *
  *   ~/target_left_wrist_yaw_link  (geometry_msgs/PoseStamped, subscribe)
  *   ~/target_right_wrist_yaw_link (geometry_msgs/PoseStamped, subscribe)
@@ -182,6 +189,7 @@ private:
   std::vector<rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr> mode_services_;
 
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr target_height_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr left_wrist_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr right_wrist_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr head_sub_;
@@ -197,6 +205,7 @@ private:
   double cmd_vel_y_{0.0};         // strafe speed   (body frame, m/s, positive = left)
   double cmd_angular_z_{0.0};     // turn rate      (rad/s); integrated each timer tick
   double heading_rad_{0.0};       // accumulated heading angle (rad)
+  double target_height_{-1.0};    // planner `height` field; -1 = mode default
   double publish_dt_{1.0 / 50.0}; // updated in constructor from publish_rate param
   rclcpp::Time last_cmd_vel_time_{0, 0, RCL_ROS_TIME}; // last cmd_vel receive time
   double cmd_vel_timeout_{0.5}; // seconds; cmd_vel zeroed if no message within this window

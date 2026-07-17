@@ -52,6 +52,24 @@
  * tracking. Chain joints that are not part of the trajectory are frozen at
  * their current /joint_states values when the goal is accepted.
  *
+ * ── Virtual base-height DOF (squat planning) ───────────────────────────────
+ * If the trajectory contains height_joint (default "pelvis_height_joint" —
+ * the virtual prismatic joint added to the MoveIt model by use_pelvis_lift),
+ * its value q (<= 0) is NOT fed to FK. Instead:
+ *   - base height = standing_height + q is published to gear_sonic_interface
+ *     ~/target_height every tick, and
+ *   - the locomotion mode is switched to idle_squat while q is below a small
+ *     threshold, and back to default when q returns to ~0. The SONIC policy
+ *     ignores the height command in IDLE but follows it continuously in
+ *     idle_squat (verified in sim), so the mode switch is handled here and
+ *     hidden from the user.
+ * The joint's commanded value is also published to /joint_states so that
+ * MoveIt's current state stays consistent (open-loop: the commanded value is
+ * assumed achieved). robot_state_publisher derives the pelvis_lift_base ->
+ * pelvis TF from it when the URDF includes the lift joint (use_pelvis_lift);
+ * set publish_lift_tf:=true to broadcast that TF from here instead when no
+ * lift-aware robot_state_publisher is running.
+ *
  * ── Parameters ─────────────────────────────────────────────────────────────
  *   publish_rate       (double, default 50.0 Hz)
  *   base_link          (string, default "pelvis")
@@ -61,6 +79,13 @@
  *   target_topic_left  (string, default "/gear_sonic_interface/target_left_wrist_yaw_link")
  *   target_topic_right (string, default "/gear_sonic_interface/target_right_wrist_yaw_link")
  *   target_topic_torso (string, default "/gear_sonic_interface/target_torso_link")
+ *   target_topic_height (string, default "/gear_sonic_interface/target_height")
+ *   height_joint       (string, default "pelvis_height_joint")
+ *   lift_base_link     (string, default "pelvis_lift_base") — TF parent for the lift joint
+ *   publish_lift_tf    (bool, default false) — broadcast lift TF from this node
+ *   standing_height    (double, default 0.789 m — kplanner default_height)
+ *   squat_mode_service (string, default "/gear_sonic_interface/mode/idle_squat")
+ *   default_mode_service (string, default "/gear_sonic_interface/mode/default")
  */
 
 #include <algorithm>
@@ -85,7 +110,10 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/trigger.hpp>
+#include <tf2_ros/transform_broadcaster.h>
 
 namespace g1_hardware
 {
@@ -115,6 +143,23 @@ public:
     };
     for (size_t i = 0; i < 3; ++i) {
       chains_[i].pub = create_publisher<geometry_msgs::msg::PoseStamped>(topics[i], 1);
+    }
+
+    // Virtual base-height DOF (squat planning); see the header comment.
+    height_joint_ = declare_parameter("height_joint", std::string("pelvis_height_joint"));
+    lift_base_link_ = declare_parameter("lift_base_link", std::string("pelvis_lift_base"));
+    standing_height_ = declare_parameter("standing_height", 0.789);
+    height_pub_ = create_publisher<std_msgs::msg::Float64>(
+        declare_parameter("target_topic_height",
+                          std::string("/gear_sonic_interface/target_height")),
+        1);
+    squat_mode_cli_ = create_client<std_srvs::srv::Trigger>(declare_parameter(
+        "squat_mode_service", std::string("/gear_sonic_interface/mode/idle_squat")));
+    default_mode_cli_ = create_client<std_srvs::srv::Trigger>(declare_parameter(
+        "default_mode_service", std::string("/gear_sonic_interface/mode/default")));
+    joint_state_pub_ = create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
+    if (declare_parameter("publish_lift_tf", false)) {
+      tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     }
 
     // robot_state_publisher publishes /robot_description with transient_local QoS
@@ -183,11 +228,14 @@ private:
         }
       }
     }
+    // The virtual lift joint is not in the (real) URDF chains but is a valid
+    // trajectory joint: it maps to the SONIC height command instead of FK.
+    known_joints_.insert(height_joint_);
     ready_ = true;
     RCLCPP_INFO(get_logger(),
-                "FK chains ready (%zu joints total). Action server: "
+                "FK chains ready (%zu joints total, incl. virtual '%s'). Action server: "
                 "~/follow_joint_trajectory",
-                known_joints_.size());
+                known_joints_.size(), height_joint_.c_str());
   }
 
   rclcpp_action::GoalResponse HandleGoal(std::shared_ptr<const FollowJointTrajectory::Goal> goal)
@@ -315,10 +363,24 @@ private:
     }
   }
 
+  void UpdateSquatMode(double lift_q)
+  {
+    // Hysteresis so the mode does not flap around lift_q ~ 0.
+    if (!squat_mode_ && lift_q < -0.02) {
+      squat_mode_ = true;
+      RCLCPP_INFO(get_logger(), "Lift %.3f m: switching locomotion mode to idle_squat.", lift_q);
+      squat_mode_cli_->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
+    } else if (squat_mode_ && lift_q > -0.005) {
+      squat_mode_ = false;
+      RCLCPP_INFO(get_logger(), "Lift returned to ~0 m: switching locomotion mode to default.");
+      default_mode_cli_->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
+    }
+  }
+
   void Tick()
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!ready_ || (!active_goal_ && !holding_)) {
+    if (!ready_) {
       return;
     }
 
@@ -342,13 +404,56 @@ private:
       }
     }
 
+    const auto lift_it = joint_cmd_.find(height_joint_);
+    const double lift_q = (lift_it != joint_cmd_.end()) ? lift_it->second : 0.0;
+
+    // The virtual lift joint's commanded value is published every tick — even
+    // before the first goal — so MoveIt's current state monitor is complete
+    // from startup and robot_state_publisher can derive the lift TF.
+    const auto stamp = now();
+    sensor_msgs::msg::JointState js;
+    js.header.stamp = stamp;
+    js.name.push_back(height_joint_);
+    js.position.push_back(lift_q);
+    joint_state_pub_->publish(js);
+
+    if (tf_broadcaster_) {
+      geometry_msgs::msg::TransformStamped tf;
+      tf.header.stamp = stamp;
+      tf.header.frame_id = lift_base_link_;
+      tf.child_frame_id = base_link_;
+      tf.transform.translation.z = lift_q;
+      tf.transform.rotation.w = 1.0;
+      tf_broadcaster_->sendTransform(tf);
+    }
+
+    if (!active_goal_ && !holding_) {
+      return;
+    }
+
     // Publish every tick (also while holding) so gear_sonic_interface's
     // pose_timeout does not release VR tracking between goals.
     PublishFkTargets();
+
+    std_msgs::msg::Float64 height;
+    height.data = standing_height_ + lift_q;
+    height_pub_->publish(height);
+    UpdateSquatMode(lift_q);
   }
 
   std::string base_link_;
   std::array<ChainContext, 3> chains_; // 0 = left wrist, 1 = right wrist, 2 = torso
+
+  // Virtual base-height DOF (squat planning)
+  std::string height_joint_;
+  std::string lift_base_link_;
+  double standing_height_{0.789};
+  bool squat_mode_{false};
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr height_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr squat_mode_cli_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr default_mode_cli_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_sub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;

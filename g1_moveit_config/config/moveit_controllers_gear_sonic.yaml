@@ -16,6 +16,7 @@ moveit_simple_controller_manager:
     action_ns: follow_joint_trajectory
     default: true
     joints:
+      - pelvis_height_joint
       - waist_yaw_joint
       - waist_roll_joint
       - waist_pitch_joint
