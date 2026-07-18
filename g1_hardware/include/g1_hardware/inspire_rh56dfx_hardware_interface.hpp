@@ -74,6 +74,7 @@ public:
     size_t motor_index;
     double open_position;
     double closed_position;
+    double deactivation_position;
   };
 
 private:
@@ -81,6 +82,7 @@ private:
   std::string command_topic_{"rt/inspire/cmd"};
   std::string state_topic_{"rt/inspire/state"};
   double state_timeout_sec_{3.0};
+  bool close_hand_on_deactivate_{true};
 
   std::vector<JointConfig> joint_configs_;
   std::vector<double> hw_positions_;

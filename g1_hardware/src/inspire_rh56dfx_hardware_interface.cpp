@@ -32,8 +32,10 @@
 #include <chrono>
 #include <cmath>
 #include <exception>
+#include <hardware_interface/lexical_casts.hpp>
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
 #include <pluginlib/class_list_macros.hpp>
+#include <stdexcept>
 #include <thread>
 #include <unitree/robot/channel/channel_factory.hpp>
 #include <unordered_map>
@@ -49,20 +51,22 @@ using JointConfig = InspireRH56DFXHardwareInterface::JointConfig;
 
 // The Inspire DDS bridge uses the normalized position convention from
 // hand_example.cpp: 0.0 = closed, 1.0 = open.
-// The table stores ROS joint positions for open and closed hand states.
+// The table stores ROS joint positions for open, fully closed, and deactivation states.
+// The deactivation pose matches inspire_dfx_hand_open_close_demo.py, including its
+// collision-free thumb yaw position.
 const std::unordered_map<std::string, JointConfig> kJointNameToConfig = {
-    {"R_pinky_proximal_joint", {0, 0.0, 1.7}},
-    {"R_ring_proximal_joint", {1, 0.0, 1.7}},
-    {"R_middle_proximal_joint", {2, 0.0, 1.7}},
-    {"R_index_proximal_joint", {3, 0.0, 1.7}},
-    {"R_thumb_proximal_pitch_joint", {4, 0.0, 0.6}},
-    {"R_thumb_proximal_yaw_joint", {5, 0.0, 1.3}},
-    {"L_pinky_proximal_joint", {6, 0.0, 1.7}},
-    {"L_ring_proximal_joint", {7, 0.0, 1.7}},
-    {"L_middle_proximal_joint", {8, 0.0, 1.7}},
-    {"L_index_proximal_joint", {9, 0.0, 1.7}},
-    {"L_thumb_proximal_pitch_joint", {10, 0.0, 0.6}},
-    {"L_thumb_proximal_yaw_joint", {11, 0.0, 1.3}},
+    {"R_pinky_proximal_joint", {0, 0.0, 1.7, 1.7}},
+    {"R_ring_proximal_joint", {1, 0.0, 1.7, 1.7}},
+    {"R_middle_proximal_joint", {2, 0.0, 1.7, 1.7}},
+    {"R_index_proximal_joint", {3, 0.0, 1.7, 1.7}},
+    {"R_thumb_proximal_pitch_joint", {4, 0.0, 0.6, 0.6}},
+    {"R_thumb_proximal_yaw_joint", {5, 0.0, 1.3, 0.3}},
+    {"L_pinky_proximal_joint", {6, 0.0, 1.7, 1.7}},
+    {"L_ring_proximal_joint", {7, 0.0, 1.7, 1.7}},
+    {"L_middle_proximal_joint", {8, 0.0, 1.7, 1.7}},
+    {"L_index_proximal_joint", {9, 0.0, 1.7, 1.7}},
+    {"L_thumb_proximal_pitch_joint", {10, 0.0, 0.6, 0.6}},
+    {"L_thumb_proximal_yaw_joint", {11, 0.0, 1.3, 0.3}},
 };
 
 double Clamp01(double value)
@@ -114,6 +118,17 @@ InspireRH56DFXHardwareInterface::on_init(const hardware_interface::HardwareInfo&
       return CallbackReturn::ERROR;
     }
   }
+  if (info.hardware_parameters.count("close_hand_on_deactivate")) {
+    const auto& parameter_value = info.hardware_parameters.at("close_hand_on_deactivate");
+    try {
+      close_hand_on_deactivate_ = hardware_interface::parse_bool(parameter_value);
+    } catch (const std::invalid_argument& e) {
+      RCLCPP_FATAL(rclcpp::get_logger("InspireRH56DFXHardwareInterface"),
+                   "Invalid close_hand_on_deactivate parameter '%s': %s", parameter_value.c_str(),
+                   e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
 
   const size_t n = info_.joints.size();
   joint_configs_.resize(n);
@@ -139,8 +154,10 @@ InspireRH56DFXHardwareInterface::on_init(const hardware_interface::HardwareInfo&
   }
 
   RCLCPP_INFO(rclcpp::get_logger("InspireRH56DFXHardwareInterface"),
-              "Initialized: command_topic=%s, state_topic=%s, network_interface=%s",
-              command_topic_.c_str(), state_topic_.c_str(), network_interface_.c_str());
+              "Initialized: command_topic=%s, state_topic=%s, network_interface=%s, "
+              "close_hand_on_deactivate=%s",
+              command_topic_.c_str(), state_topic_.c_str(), network_interface_.c_str(),
+              close_hand_on_deactivate_ ? "true" : "false");
 
   return CallbackReturn::SUCCESS;
 }
@@ -241,6 +258,30 @@ InspireRH56DFXHardwareInterface::on_activate(const rclcpp_lifecycle::State& /*pr
 hardware_interface::CallbackReturn
 InspireRH56DFXHardwareInterface::on_deactivate(const rclcpp_lifecycle::State& /*previous_state*/)
 {
+  if (close_hand_on_deactivate_ && hand_command_publisher_) {
+    command_msg_.cmds().resize(kMotorCount);
+    for (size_t i = 0; i < info_.joints.size(); ++i) {
+      const auto& cfg = joint_configs_[i];
+      hw_commands_[i] = cfg.deactivation_position;
+      command_msg_.cmds()
+          .at(cfg.motor_index)
+          .q(static_cast<float>(JointPositionToOpenFraction(hw_commands_[i], cfg)));
+    }
+
+    RCLCPP_INFO(rclcpp::get_logger("InspireRH56DFXHardwareInterface"),
+                "Closing RH56DFX hands before deactivation.");
+
+    // Repeat briefly so the external serial bridge receives the final target before DDS teardown.
+    constexpr size_t kPublishCount = 5;
+    constexpr auto kPublishPeriod = std::chrono::milliseconds(20);
+    for (size_t i = 0; i < kPublishCount; ++i) {
+      hand_command_publisher_->Write(command_msg_);
+      if (i + 1 < kPublishCount) {
+        std::this_thread::sleep_for(kPublishPeriod);
+      }
+    }
+  }
+
   hand_command_publisher_.reset();
   hand_state_subscriber_.reset();
   active_command_interfaces_ = 0;
