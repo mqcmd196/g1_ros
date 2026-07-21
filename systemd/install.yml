@@ -1,0 +1,61 @@
+---
+# Install the g1_ros systemd units into /etc/systemd/system as symlinks that
+# point back at the files in this repository, then reload systemd. Editing a
+# unit file in the repo is immediately reflected (after `systemctl daemon-reload`)
+# because the installed unit is a symlink, not a copy.
+#
+# Usage
+# -----
+# On the robot itself (control node == target):
+#   ansible-playbook --ask-become-pass systemd/install.yml
+#
+# From a separate control node (override the target-side repo path):
+#   ansible-playbook -i <robot-host>, -u unitree --become \
+#       -e g1_ros_dir=/home/unitree/ros/colcon_ws/src/g1_ros \
+#       systemd/install.yml
+#
+# g1_ros_dir must be the ABSOLUTE path of this repo *on the target*, because a
+# systemd unit symlink is resolved on the target at boot. It defaults to this
+# playbook's parent directory, which is correct when Ansible runs on the robot.
+- name: Install g1_ros systemd services as symlinks
+  hosts: all
+  become: true
+  vars:
+    g1_ros_dir: "{{ playbook_dir | dirname }}"
+    systemd_dir: /etc/systemd/system
+    # enabled: only units that declare an [Install] section can be enabled.
+    # gear-sonic and the bringup currently have no [Install] (the bringup pulls
+    # gear-sonic in via Requires=), so they are installed but not enabled here.
+    g1_services:
+      - name: inspire-g1.service
+        enabled: true
+      - name: gear-sonic.service
+        enabled: false
+      - name: ros2-g1-gear-sonic-bringup.service
+        enabled: false
+  tasks:
+    - name: Symlink unit files into {{ systemd_dir }}
+      ansible.builtin.file:
+        src: "{{ g1_ros_dir }}/systemd/{{ item.name }}"
+        dest: "{{ systemd_dir }}/{{ item.name }}"
+        state: link
+        force: true
+      loop: "{{ g1_services }}"
+      notify: Reload systemd
+
+    - name: Reload systemd before enabling
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable services that declare [Install]
+      ansible.builtin.systemd:
+        name: "{{ item.name }}"
+        enabled: true
+      loop: "{{ g1_services }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.enabled | bool
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true

@@ -116,6 +116,51 @@ The MoveIt model additionally gains a virtual prismatic joint `pelvis_height_joi
 > [!WARNING]
 > Do **not** activate `upper_body_controller` while SONIC is in control — its arm commands conflict with the whole-body policy. The Inspire hand controllers use separate DDS topics and can be used together with SONIC.
 
+## Running as systemd services (on the robot)
+
+The `systemd/` directory contains unit files to run the stack as services on the robot:
+
+| Unit | What it runs | Autostart |
+|---|---|---|
+| `inspire-g1.service` | Inspire RH56DFX hand service (`inspire_g1`) | enabled (starts on boot) |
+| `gear-sonic.service` | SONIC deploy stack (`gear_sonic_deploy/deploy.sh`) | manual |
+| `ros2-g1-gear-sonic-bringup.service` | `g1_bringup` in the `ghcr.io/mqcmd196/g1_ros` container via `rocker` | manual |
+
+### Install
+
+An Ansible playbook installs the units into `/etc/systemd/system` as **symlinks** back to the files in this repository (so editing a unit here and running `systemctl daemon-reload` is enough — no copy to keep in sync) and reloads systemd.
+
+Run on the robot itself:
+
+```shell
+ansible-playbook --ask-become-pass systemd/install.yml
+```
+
+Or from another control node (override with the repo's absolute path **on the robot**):
+
+```shell
+ansible-playbook -i <robot-host>, -u unitree --become \
+    -e g1_ros_dir=/home/unitree/ros/colcon_ws/src/g1_ros \
+    systemd/install.yml
+```
+
+Only `inspire-g1.service` is enabled (it has an `[Install]` section). `gear-sonic.service` and `ros2-g1-gear-sonic-bringup.service` are installed but started manually.
+
+### Start / stop
+
+```shell
+# Start SONIC + the ROS bringup (the bringup pulls in gear-sonic via Requires=)
+sudo systemctl start ros2-g1-gear-sonic-bringup
+# Stop
+sudo systemctl stop ros2-g1-gear-sonic-bringup gear-sonic
+# Follow logs
+journalctl -u ros2-g1-gear-sonic-bringup -f
+journalctl -u gear-sonic -f
+```
+
+> [!NOTE]
+> `ros2-g1-gear-sonic-bringup.service` runs the `ghcr.io/mqcmd196/g1_ros` container image (built from `master`), not your local workspace. Rebuild/pull the image to pick up changes that are merged to `master`.
+
 ## Contribution
 
 ### Prerequisite
