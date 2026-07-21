@@ -181,7 +181,7 @@ public:
                std::shared_ptr<const FollowJointTrajectory::Goal> goal) {
           return HandleGoal(goal);
         },
-        [this](std::shared_ptr<GoalHandleFJT>) { return rclcpp_action::CancelResponse::ACCEPT; },
+        [](std::shared_ptr<GoalHandleFJT>) { return rclcpp_action::CancelResponse::ACCEPT; },
         [this](std::shared_ptr<GoalHandleFJT> goal_handle) { HandleAccepted(goal_handle); });
 
     const auto period = std::chrono::duration<double>(1.0 / publish_rate);
