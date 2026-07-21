@@ -1,0 +1,24 @@
+[Unit]
+Description=Unitree G1 ROS 2 Gear Sonic Bringup
+Requires=docker.service gear-sonic.service
+After=docker.service gear-sonic.service
+
+[Service]
+Type=simple
+User=unitree
+WorkingDirectory=/home/unitree
+
+Environment="HOME=/home/unitree"
+Environment="PATH=/home/unitree/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStartPre=-/usr/bin/docker rm -f g1-bringup
+
+ExecStart=/home/unitree/.local/bin/rocker --mode non-interactive --name g1-bringup --env ROS_DOMAIN_ID=164 --network host --privileged ghcr.io/mqcmd196/g1_ros:latest "bash -lc 'source /root/target_ws/install/setup.bash && exec ros2 launch g1_bringup g1_bringup.launch.py hand_type:=inspire_dfq network_interface:=enP8p1s0 use_gear_sonic:=true use_rviz:=false'"
+
+ExecStop=-/usr/bin/docker stop --time 10 g1-bringup
+
+Restart=no
+TimeoutStopSec=30
+
+StandardOutput=journal
+StandardError=journal

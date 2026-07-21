@@ -1,0 +1,17 @@
+[Unit]
+Description=Inspire G1 Service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/unitree/dfx_inspire_service/build
+ExecStart=/home/unitree/dfx_inspire_service/build/inspire_g1 -k -u
+
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
