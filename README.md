@@ -61,9 +61,12 @@ ros2 run g1_bringup inspire_dfx_hand_open_close_demo --ros-args -p hand:=both
 
 ## gear_sonic (SONIC) locomotion
 
-`g1_hardware` provides `gear_sonic_interface`, a bridge that sends locomotion, VR 3-point upper-body and SMPL-motion commands to the [GR00T-WholeBodyControl](https://github.com/NVlabs/GR00T-WholeBodyControl) (SONIC) deploy stack over ZMQ. Enable it with `use_gear_sonic:=true` on `hardware.launch.py` or `g1_bringup.launch.py`.
+`g1_hardware` provides `gear_sonic_interface`, a bridge that sends locomotion, VR 3-point upper-body and SMPL-motion commands to the [GR00T-WholeBodyControl](https://github.com/NVlabs/GR00T-WholeBodyControl) (SONIC) deploy stack over ZMQ, and `gear_sonic_controller`, a `FollowJointTrajectory` action server that lets MoveIt execute trajectories through SONIC (FK → VR 3-point targets). Enable both with `use_gear_sonic:=true` on `hardware.launch.py` or `g1_bringup.launch.py`.
 
 `zmq_host` is the address the interface **binds** its ZMQ XPUB socket to; the deploy stack connects to it. The default `127.0.0.1` only accepts a deploy stack running on the same machine (simulation). For the real robot, set `zmq_host:=0.0.0.0`.
+
+> [!IMPORTANT]
+> Run **all** ROS 2 nodes and CLI commands with a non-zero `ROS_DOMAIN_ID` (e.g. `export ROS_DOMAIN_ID=1`). unitree DDS (the sim / deploy stack / g1_hardware) is fixed to domain 0 and shares the RTPS port range with ROS 2 domain 0; with MoveIt + RViz running, domain 0 runs out of participant slots and the hardware interface fails with `Failed to find a free participant index`.
 
 ### Simulation (MuJoCo)
 
@@ -74,8 +77,10 @@ The MuJoCo simulator of GR00T-WholeBodyControl publishes the same DDS topics as 
 python gear_sonic/scripts/run_sim_loop.py
 # Terminal 2: SONIC controller (in gear_sonic_deploy)
 ./deploy.sh --input-type zmq_manager sim
-# Terminal 3: ROS driver
+# Terminal 3: ROS driver only
 ros2 launch g1_hardware hardware.launch.py network_interface:=lo use_gear_sonic:=true
+# ... or the full stack with MoveIt + RViz
+ros2 launch g1_bringup g1_bringup.launch.py network_interface:=lo use_gear_sonic:=true
 ```
 
 ### Real robot
@@ -96,7 +101,17 @@ ros2 service call /gear_sonic_interface/enable_control std_srvs/srv/SetBool "{da
 ros2 topic pub /gear_sonic_interface/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.5}}" -r 10
 ```
 
-Locomotion modes (`~/mode/*` services), VR 3-point upper-body targets and full-body SMPL streaming are also available. See the header comment of `g1_hardware/include/g1_hardware/gear_sonic_interface.hpp` for the full interface.
+Locomotion modes (`~/mode/*` services), VR 3-point upper-body targets, base height (`~/target_height`) and full-body SMPL streaming are also available. See the header comment of `g1_hardware/include/g1_hardware/gear_sonic_interface.hpp` for the full interface. Pose targets are interpreted as URDF link poses (the `vr_3point_body_offset` keypoint offset is applied internally) and are tracked stiffly by default (`left_wrist_compliance` / `right_wrist_compliance` / `head_compliance` launch arguments, 0.0-1.0 each, 0.0 = exact tracking); targets are released when their topic stops for `pose_timeout` (0.5 s).
+
+### MoveIt
+
+With `use_gear_sonic:=true`, `g1_bringup.launch.py` routes MoveIt trajectory execution to `gear_sonic_controller` instead of the ros2_control `upper_body_controller`. Plan & Execute in RViz works as usual; only the wrist / torso poses are reproduced — the RL policy chooses its own whole-body joint angles.
+
+The MoveIt model additionally gains a virtual prismatic joint `pelvis_height_joint` (world → pelvis), so IK can lower the whole body. Select the **`left_arm_with_waist`** or **`right_arm_with_waist`** planning group in RViz and drag the goal below the standing workspace: the plan uses the lift joint and, on execution, `gear_sonic_controller` converts it to the SONIC base-height command with an automatic `idle_squat`/`default` mode switch — the robot squats to reach, and stands back up when the goal returns high. Notes:
+
+- `both_arms_with_waist` has no IK solver (two-tip group); its RViz markers fall back to the arm-only subgroups and cannot go low. Use it for joint-space goals only.
+- The reachable wrist height is about 0.5 m below the standing pelvis (full lift + waist pitch limit).
+- The RViz robot display keeps the legs straight while squatting (the lift joint is a planning-only dummy; the real legs are driven by the policy).
 
 > [!WARNING]
 > Do **not** activate `upper_body_controller` while SONIC is in control — its arm commands conflict with the whole-body policy. The Inspire hand controllers use separate DDS topics and can be used together with SONIC.

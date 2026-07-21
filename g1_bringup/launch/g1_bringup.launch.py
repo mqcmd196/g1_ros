@@ -103,14 +103,27 @@ def _launch_setup(context, *args, **kwargs):
     use_rviz = LaunchConfiguration("use_rviz").perform(context).lower()
     use_gear_sonic = LaunchConfiguration("use_gear_sonic").perform(context)
     zmq_host = LaunchConfiguration("zmq_host").perform(context)
+    left_wrist_compliance = LaunchConfiguration("left_wrist_compliance").perform(
+        context
+    )
+    right_wrist_compliance = LaunchConfiguration("right_wrist_compliance").perform(
+        context
+    )
+    head_compliance = LaunchConfiguration("head_compliance").perform(context)
 
     cfg = _HARDWARE_CONFIG[hand_type]
 
     g1_hw_share = Path(get_package_share_directory("g1_hardware"))
     g1_moveit_share = Path(get_package_share_directory("g1_moveit_config"))
 
+    # With gear_sonic, MoveIt plans with the virtual pelvis_height_joint so that
+    # low targets are reachable by squatting (gear_sonic_controller maps the
+    # joint to the SONIC base-height command). The hardware-side URDF (RSP,
+    # ros2_control) stays lift-free — only MoveIt's model differs.
+    use_pelvis_lift = "true" if use_gear_sonic.lower() == "true" else "false"
+
     # Build moveit_config for MoveIt nodes (RSP is handled by hardware launch)
-    moveit_config = (
+    moveit_config_builder = (
         MoveItConfigsBuilder("g1_29dof", package_name="g1_moveit_config")
         .robot_description(
             file_path=str(g1_hw_share / f"config/{cfg['urdf_xacro']}"),
@@ -124,17 +137,27 @@ def _launch_setup(context, *args, **kwargs):
                 "inspire_state_topic": inspire_state_topic,
                 "inspire_state_timeout_sec": inspire_state_timeout_sec,
                 "close_hand_on_deactivate": close_hand_on_deactivate,
+                "use_pelvis_lift": use_pelvis_lift,
             },
         )
         .robot_description_semantic(
             file_path=str(g1_moveit_share / f"config/{cfg['srdf']}"),
+            mappings={"use_pelvis_lift": use_pelvis_lift},
         )
         .planning_pipelines(
             pipelines=["ompl"],
             default_planning_pipeline="ompl",
         )
-        .to_moveit_configs()
     )
+    if use_gear_sonic.lower() == "true":
+        # Execute trajectories through the gear_sonic FK adapter instead of the
+        # ros2_control upper_body_controller (which conflicts with SONIC).
+        moveit_config_builder = moveit_config_builder.trajectory_execution(
+            file_path=str(
+                g1_moveit_share / "config/moveit_controllers_gear_sonic.yaml"
+            ),
+        )
+    moveit_config = moveit_config_builder.to_moveit_configs()
 
     # Hardware driver (RSP + ros2_control_node + spawners)
     hw_launch = IncludeLaunchDescription(
@@ -150,8 +173,16 @@ def _launch_setup(context, *args, **kwargs):
             "inspire_state_topic": inspire_state_topic,
             "inspire_state_timeout_sec": inspire_state_timeout_sec,
             "close_hand_on_deactivate": close_hand_on_deactivate,
+            # use_gear_sonic also makes hardware.launch.py build the URDF with
+            # the virtual pelvis_height_joint, so RSP publishes the same
+            # (lift-including) model as MoveIt uses — otherwise RViz's
+            # MotionPlanning display (which falls back to the
+            # /robot_description topic) crashes on the unknown lift joint.
             "use_gear_sonic": use_gear_sonic,
             "zmq_host": zmq_host,
+            "left_wrist_compliance": left_wrist_compliance,
+            "right_wrist_compliance": right_wrist_compliance,
+            "head_compliance": head_compliance,
         }.items(),
     )
 
@@ -244,6 +275,30 @@ def generate_launch_description():
                     "gear_sonic_interface XPUB bind address (only used with "
                     "use_gear_sonic:=true). Default accepts the deploy stack on "
                     "this machine only (sim); use 0.0.0.0 for the real robot"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "left_wrist_compliance",
+                default_value="0.0",
+                description=(
+                    "SONIC left wrist tracking compliance, 0.0-1.0; 0.0 = stiff "
+                    "(exact tracking). Only used with use_gear_sonic:=true."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "right_wrist_compliance",
+                default_value="0.0",
+                description=(
+                    "SONIC right wrist tracking compliance, 0.0-1.0; 0.0 = stiff "
+                    "(exact tracking). Only used with use_gear_sonic:=true."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "head_compliance",
+                default_value="0.0",
+                description=(
+                    "SONIC head tracking compliance, 0.0-1.0; 0.0 = stiff "
+                    "(exact tracking). Only used with use_gear_sonic:=true."
                 ),
             ),
             OpaqueFunction(function=_launch_setup),

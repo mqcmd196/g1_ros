@@ -40,6 +40,15 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE "PLUGINLIB_BUILDING_LIBRARY")
 
 pluginlib_export_plugin_description_file(hardware_interface g1_hardware_plugin.xml)
 
+ament_auto_add_library(gear_sonic_controller SHARED
+  src/gear_sonic_controller.cpp
+)
+
+rclcpp_components_register_node(gear_sonic_controller
+  PLUGIN "g1_hardware::GearSonicController"
+  EXECUTABLE gear_sonic_controller_node
+)
+
 ament_auto_add_library(loco_cmd_adapter SHARED
   src/loco_cmd_adapter.cpp
 )

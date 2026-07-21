@@ -28,8 +28,11 @@
 
 #include "g1_hardware/gear_sonic_interface.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
+#include <thread>
 
 #include <rclcpp_components/register_node_macro.hpp>
 
@@ -66,7 +69,16 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   const int zmq_port = declare_parameter("zmq_port", 5556);
   const double publish_rate = declare_parameter("publish_rate", 50.0);
   cmd_vel_timeout_ = declare_parameter("cmd_vel_timeout", 0.5);
+  pose_timeout_ = declare_parameter("pose_timeout", 0.5);
   smpl_window_size_ = static_cast<size_t>(declare_parameter("smpl_window_size", 5));
+  apply_body_offset_ = declare_parameter("apply_vr_3point_body_offset", true);
+  // End-effector tracking compliance per keypoint, each 0.0-1.0; 0 = stiff.
+  // Sent as the SONIC planner `vr_compliance` field. The deploy-side default
+  // when the field is not sent is {0.5, 0.5, 0.0} (compliant wrists) — we
+  // default to stiff so commanded poses are reproduced accurately.
+  vr_compliance_[0] = static_cast<float>(declare_parameter("left_wrist_compliance", 0.0));
+  vr_compliance_[1] = static_cast<float>(declare_parameter("right_wrist_compliance", 0.0));
+  vr_compliance_[2] = static_cast<float>(declare_parameter("head_compliance", 0.0));
   publish_dt_ = 1.0 / publish_rate;
 
   // ZMQ: bind XPUB socket so the deploy stack SUB can connect to us.
@@ -117,6 +129,17 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   cmd_vel_sub_ = create_subscription<geometry_msgs::msg::Twist>(
       "~/cmd_vel", 1, [this](geometry_msgs::msg::Twist::ConstSharedPtr msg) { OnCmdVel(msg); });
 
+  // Desired base height (m); forwarded as the planner `height` field.
+  // Standing default is 0.789 m (kplanner config default_height); -1 = mode default.
+  target_height_sub_ = create_subscription<std_msgs::msg::Float64>(
+      "~/target_height", 1, [this](std_msgs::msg::Float64::ConstSharedPtr msg) {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        if (msg->data != target_height_) {
+          RCLCPP_INFO(get_logger(), "Target base height → %.3f m", msg->data);
+        }
+        target_height_ = msg->data;
+      });
+
   left_wrist_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
       "~/target_left_wrist_yaw_link", 1,
       [this](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) { OnLeftWrist(msg); });
@@ -145,11 +168,64 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
 
 GearSonicInterface::~GearSonicInterface()
 {
-  if (zmq_sock_) {
-    const auto stop_msg = BuildCommandMessage(/*start=*/false, /*stop=*/true, /*planner=*/false);
-    zmq_sock_->send(zmq::buffer(stop_msg), zmq::send_flags::none);
-    zmq_sock_->close();
+  if (!zmq_sock_) {
+    return;
   }
+
+  // Stop the timer so it cannot send competing planner messages while we settle.
+  if (timer_) {
+    timer_->cancel();
+  }
+
+  // Graceful settle: if the deploy is under VR control, ramp the VR targets from
+  // the last commanded pose to the natural rest pose over shutdown_settle_time_
+  // so SONIC lowers the arms *smoothly* instead of snapping to the reference pose
+  // when tracking is released. Plain C++ loop (no rclcpp time/logging) because
+  // this runs during node teardown. Gantry-suspended use is assumed — the robot
+  // goes limp once stop is sent / the socket closes below.
+  if (control_active_ && deploy_connected_ && any_pose_received_ && kShutdownSettleTime > 0.0) {
+    const std::array<float, 9> start_pos = vr_position_;
+    const std::array<float, 12> start_orn = vr_orientation_;
+    const int steps = std::max(1, static_cast<int>(std::lround(kShutdownSettleTime / publish_dt_)));
+
+    auto normalize_quat = [](float& w, float& x, float& y, float& z) {
+      const float n = std::sqrt(w * w + x * x + y * y + z * z);
+      if (n > 1e-6f) {
+        w /= n;
+        x /= n;
+        y /= n;
+        z /= n;
+      }
+    };
+
+    for (int i = 1; i <= steps; ++i) {
+      const float a = static_cast<float>(i) / static_cast<float>(steps);
+      std::array<float, 9> pos;
+      std::array<float, 12> orn;
+      for (size_t j = 0; j < 9; ++j) {
+        pos[j] = start_pos[j] + a * (kDefaultVrPosition[j] - start_pos[j]);
+      }
+      // Per-endpoint quaternion nlerp (adequate for a ~1 s settle before damping).
+      for (size_t k = 0; k < 3; ++k) {
+        const size_t b = k * 4;
+        for (size_t j = 0; j < 4; ++j) {
+          orn[b + j] = start_orn[b + j] + a * (kDefaultVrOrientation[b + j] - start_orn[b + j]);
+        }
+        normalize_quat(orn[b + 0], orn[b + 1], orn[b + 2], orn[b + 3]);
+      }
+      const auto msg =
+          BuildPlannerMessage(/*mode=*/0, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
+                              /*speed=*/-1.0f, /*height=*/-1.0f, &pos, &orn, &vr_compliance_);
+      zmq_sock_->send(zmq::buffer(msg), zmq::send_flags::dontwait);
+      std::this_thread::sleep_for(std::chrono::duration<double>(publish_dt_));
+    }
+  }
+
+  // Damping stop, then close (both make the robot go limp; sending stop is the
+  // deterministic path). Arms are already at the rest pose from the settle above.
+  const auto stop_msg = BuildCommandMessage(/*start=*/false, /*stop=*/true, /*planner=*/false);
+  zmq_sock_->send(zmq::buffer(stop_msg), zmq::send_flags::none);
+  zmq_sock_->close();
 }
 
 // ──────────────────────────────────────────────
@@ -237,43 +313,53 @@ void GearSonicInterface::OnCmdVel(geometry_msgs::msg::Twist::ConstSharedPtr msg)
 //   SONIC vr_orientation: (w, x, y, z) ← reordered in each callback below
 // ──────────────────────────────────────────────
 
+void GearSonicInterface::StoreTargetPose(size_t idx, const geometry_msgs::msg::PoseStamped& msg)
+{
+  const float qw = static_cast<float>(msg.pose.orientation.w);
+  const float qx = static_cast<float>(msg.pose.orientation.x);
+  const float qy = static_cast<float>(msg.pose.orientation.y);
+  const float qz = static_cast<float>(msg.pose.orientation.z);
+  float px = static_cast<float>(msg.pose.position.x);
+  float py = static_cast<float>(msg.pose.position.y);
+  float pz = static_cast<float>(msg.pose.position.z);
+
+  if (apply_body_offset_) {
+    // Convert the link pose to the policy keypoint: pos + R(quat) * offset.
+    // R * v via quaternion: v + 2*qv x (qv x v + qw*v)
+    const auto& o = kVr3PointBodyOffset[idx];
+    const float tx = 2.0f * (qy * o[2] - qz * o[1]);
+    const float ty = 2.0f * (qz * o[0] - qx * o[2]);
+    const float tz = 2.0f * (qx * o[1] - qy * o[0]);
+    px += o[0] + qw * tx + qy * tz - qz * ty;
+    py += o[1] + qw * ty + qz * tx - qx * tz;
+    pz += o[2] + qw * tz + qx * ty - qy * tx;
+  }
+
+  std::lock_guard<std::mutex> lock(data_mutex_);
+  vr_position_[idx * 3 + 0] = px;
+  vr_position_[idx * 3 + 1] = py;
+  vr_position_[idx * 3 + 2] = pz;
+  vr_orientation_[idx * 4 + 0] = qw;
+  vr_orientation_[idx * 4 + 1] = qx;
+  vr_orientation_[idx * 4 + 2] = qy;
+  vr_orientation_[idx * 4 + 3] = qz;
+  any_pose_received_ = true;
+  last_pose_time_ = now();
+}
+
 void GearSonicInterface::OnLeftWrist(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(data_mutex_);
-  vr_position_[0] = static_cast<float>(msg->pose.position.x);
-  vr_position_[1] = static_cast<float>(msg->pose.position.y);
-  vr_position_[2] = static_cast<float>(msg->pose.position.z);
-  vr_orientation_[0] = static_cast<float>(msg->pose.orientation.w);
-  vr_orientation_[1] = static_cast<float>(msg->pose.orientation.x);
-  vr_orientation_[2] = static_cast<float>(msg->pose.orientation.y);
-  vr_orientation_[3] = static_cast<float>(msg->pose.orientation.z);
-  any_pose_received_ = true;
+  StoreTargetPose(0, *msg);
 }
 
 void GearSonicInterface::OnRightWrist(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(data_mutex_);
-  vr_position_[3] = static_cast<float>(msg->pose.position.x);
-  vr_position_[4] = static_cast<float>(msg->pose.position.y);
-  vr_position_[5] = static_cast<float>(msg->pose.position.z);
-  vr_orientation_[4] = static_cast<float>(msg->pose.orientation.w);
-  vr_orientation_[5] = static_cast<float>(msg->pose.orientation.x);
-  vr_orientation_[6] = static_cast<float>(msg->pose.orientation.y);
-  vr_orientation_[7] = static_cast<float>(msg->pose.orientation.z);
-  any_pose_received_ = true;
+  StoreTargetPose(1, *msg);
 }
 
 void GearSonicInterface::OnHead(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(data_mutex_);
-  vr_position_[6] = static_cast<float>(msg->pose.position.x);
-  vr_position_[7] = static_cast<float>(msg->pose.position.y);
-  vr_position_[8] = static_cast<float>(msg->pose.position.z);
-  vr_orientation_[8] = static_cast<float>(msg->pose.orientation.w);
-  vr_orientation_[9] = static_cast<float>(msg->pose.orientation.x);
-  vr_orientation_[10] = static_cast<float>(msg->pose.orientation.y);
-  vr_orientation_[11] = static_cast<float>(msg->pose.orientation.z);
-  any_pose_received_ = true;
+  StoreTargetPose(2, *msg);
 }
 
 void GearSonicInterface::TimerCallback()
@@ -313,6 +399,23 @@ void GearSonicInterface::TimerCallback()
   }
 
   std::lock_guard<std::mutex> lock(data_mutex_);
+
+  // ── Pose target timeout ────────────────────────────────────────────────
+  // Mirror pico_manager: when the VR pose stream stops, vr fields are no longer
+  // sent, the deploy sets has_vr_3point_control_ = false and reverts to the
+  // planner reference motion. Without this, the last target would be latched
+  // forever and leak into later sessions.
+  if (any_pose_received_ && pose_timeout_ > 0.0 &&
+      (now() - last_pose_time_).seconds() > pose_timeout_)
+  {
+    any_pose_received_ = false;
+    vr_position_ = kDefaultVrPosition;
+    vr_orientation_ = kDefaultVrOrientation;
+    RCLCPP_INFO(get_logger(),
+                "No pose target for %.2f s: VR 3-point tracking released "
+                "(deploy reverts to the planner reference motion).",
+                pose_timeout_);
+  }
 
   // ── Locomotion: convert cmd_vel (body frame) to movement/facing (world frame) ──
   //
@@ -428,12 +531,13 @@ void GearSonicInterface::TimerCallback()
   // Include vr_position/vr_orientation as soon as ANY pose topic has been received.
   // Endpoints that have not been published yet keep their default values (set in the
   // header: natural standing pose in pelvis frame), so a single-topic publisher works.
+  const float height = static_cast<float>(target_height_);
   std::vector<uint8_t> msg;
   if (any_pose_received_) {
-    msg = BuildPlannerMessage(active_mode, movement, facing, speed, /*height=*/-1.0f, &vr_position_,
-                              &vr_orientation_);
+    msg = BuildPlannerMessage(active_mode, movement, facing, speed, height, &vr_position_,
+                              &vr_orientation_, &vr_compliance_);
   } else {
-    msg = BuildPlannerMessage(active_mode, movement, facing, speed, /*height=*/-1.0f);
+    msg = BuildPlannerMessage(active_mode, movement, facing, speed, height);
   }
   zmq_sock_->send(zmq::buffer(msg), zmq::send_flags::dontwait);
 }
@@ -474,7 +578,8 @@ std::vector<uint8_t> GearSonicInterface::BuildCommandMessage(bool start, bool st
 
 std::vector<uint8_t> GearSonicInterface::BuildPlannerMessage(
     int mode, std::array<float, 3> movement, std::array<float, 3> facing, float speed, float height,
-    const std::array<float, 9>* vr_position, const std::array<float, 12>* vr_orientation)
+    const std::array<float, 9>* vr_position, const std::array<float, 12>* vr_orientation,
+    const std::array<float, 3>* vr_compliance)
 {
   std::string fields = "[{\"name\":\"mode\",\"dtype\":\"i32\",\"shape\":[1]},"
                        "{\"name\":\"movement\",\"dtype\":\"f32\",\"shape\":[3]},"
@@ -486,6 +591,9 @@ std::vector<uint8_t> GearSonicInterface::BuildPlannerMessage(
   }
   if (vr_orientation) {
     fields += ",{\"name\":\"vr_orientation\",\"dtype\":\"f32\",\"shape\":[12]}";
+  }
+  if (vr_compliance) {
+    fields += ",{\"name\":\"vr_compliance\",\"dtype\":\"f32\",\"shape\":[3]}";
   }
   fields += "]";
 
@@ -517,6 +625,11 @@ std::vector<uint8_t> GearSonicInterface::BuildPlannerMessage(
   }
   if (vr_orientation) {
     for (float v : *vr_orientation) {
+      append(msg, &v, 4);
+    }
+  }
+  if (vr_compliance) {
+    for (float v : *vr_compliance) {
       append(msg, &v, 4);
     }
   }
