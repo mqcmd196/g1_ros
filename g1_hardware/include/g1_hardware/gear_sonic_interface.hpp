@@ -247,6 +247,10 @@ private:
   rclcpp::Time last_pose_time_{0, 0, RCL_ROS_TIME}; // last pose target receive time
   double pose_timeout_{0.5}; // seconds; vr fields dropped if no pose within this window
 
+  // Graceful arm-lowering ramp duration in the destructor (fixed, not a parameter).
+  // Gantry-suspended use is assumed; the robot goes limp after the socket closes.
+  static constexpr double kShutdownSettleTime = 1.0; // seconds
+
   bool control_active_{false};
 
   // Full-body SMPL streaming state. When streaming_smpl_ is true the deploy is in

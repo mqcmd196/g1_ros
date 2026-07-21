@@ -28,8 +28,11 @@
 
 #include "g1_hardware/gear_sonic_interface.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
+#include <thread>
 
 #include <rclcpp_components/register_node_macro.hpp>
 
@@ -165,11 +168,64 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
 
 GearSonicInterface::~GearSonicInterface()
 {
-  if (zmq_sock_) {
-    const auto stop_msg = BuildCommandMessage(/*start=*/false, /*stop=*/true, /*planner=*/false);
-    zmq_sock_->send(zmq::buffer(stop_msg), zmq::send_flags::none);
-    zmq_sock_->close();
+  if (!zmq_sock_) {
+    return;
   }
+
+  // Stop the timer so it cannot send competing planner messages while we settle.
+  if (timer_) {
+    timer_->cancel();
+  }
+
+  // Graceful settle: if the deploy is under VR control, ramp the VR targets from
+  // the last commanded pose to the natural rest pose over shutdown_settle_time_
+  // so SONIC lowers the arms *smoothly* instead of snapping to the reference pose
+  // when tracking is released. Plain C++ loop (no rclcpp time/logging) because
+  // this runs during node teardown. Gantry-suspended use is assumed — the robot
+  // goes limp once stop is sent / the socket closes below.
+  if (control_active_ && deploy_connected_ && any_pose_received_ && kShutdownSettleTime > 0.0) {
+    const std::array<float, 9> start_pos = vr_position_;
+    const std::array<float, 12> start_orn = vr_orientation_;
+    const int steps = std::max(1, static_cast<int>(std::lround(kShutdownSettleTime / publish_dt_)));
+
+    auto normalize_quat = [](float& w, float& x, float& y, float& z) {
+      const float n = std::sqrt(w * w + x * x + y * y + z * z);
+      if (n > 1e-6f) {
+        w /= n;
+        x /= n;
+        y /= n;
+        z /= n;
+      }
+    };
+
+    for (int i = 1; i <= steps; ++i) {
+      const float a = static_cast<float>(i) / static_cast<float>(steps);
+      std::array<float, 9> pos;
+      std::array<float, 12> orn;
+      for (size_t j = 0; j < 9; ++j) {
+        pos[j] = start_pos[j] + a * (kDefaultVrPosition[j] - start_pos[j]);
+      }
+      // Per-endpoint quaternion nlerp (adequate for a ~1 s settle before damping).
+      for (size_t k = 0; k < 3; ++k) {
+        const size_t b = k * 4;
+        for (size_t j = 0; j < 4; ++j) {
+          orn[b + j] = start_orn[b + j] + a * (kDefaultVrOrientation[b + j] - start_orn[b + j]);
+        }
+        normalize_quat(orn[b + 0], orn[b + 1], orn[b + 2], orn[b + 3]);
+      }
+      const auto msg =
+          BuildPlannerMessage(/*mode=*/0, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
+                              /*speed=*/-1.0f, /*height=*/-1.0f, &pos, &orn, &vr_compliance_);
+      zmq_sock_->send(zmq::buffer(msg), zmq::send_flags::dontwait);
+      std::this_thread::sleep_for(std::chrono::duration<double>(publish_dt_));
+    }
+  }
+
+  // Damping stop, then close (both make the robot go limp; sending stop is the
+  // deterministic path). Arms are already at the rest pose from the settle above.
+  const auto stop_msg = BuildCommandMessage(/*start=*/false, /*stop=*/true, /*planner=*/false);
+  zmq_sock_->send(zmq::buffer(stop_msg), zmq::send_flags::none);
+  zmq_sock_->close();
 }
 
 // ──────────────────────────────────────────────
