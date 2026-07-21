@@ -1,0 +1,16 @@
+[Unit]
+Description=GEAR Sonic
+After=network.target
+
+[Service]
+Type=simple
+User=unitree
+WorkingDirectory=/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy
+
+StandardInput=data
+StandardInputText=y
+
+ExecStart=/bin/bash -lc 'source /home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/scripts/setup_env.sh && exec /home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/deploy.sh --input-type zmq_manager real'
+
+StandardOutput=journal
+StandardError=journal
