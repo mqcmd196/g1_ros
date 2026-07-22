@@ -52,12 +52,13 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    GroupAction,
     IncludeLaunchDescription,
     OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
 from moveit_configs_utils import MoveItConfigsBuilder
 from moveit_configs_utils.launches import (
     generate_move_group_launch,
@@ -211,16 +212,32 @@ def _launch_setup(context, *args, **kwargs):
 
     if use_d435i == "true":
         realsense_share = Path(get_package_share_directory("realsense2_camera"))
+        d435i_launch = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(str(realsense_share / "launch/rs_launch.py")),
+            launch_arguments={
+                "camera_name": "d435",
+                "camera_namespace": "head_camera",
+            }.items(),
+        )
         actions.append(
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    str(realsense_share / "launch/rs_launch.py")
-                ),
-                launch_arguments={
-                    "camera_name": "d435",
-                    "camera_namespace": "head_camera",
-                    "pointcloud.enable": "true",
-                }.items(),
+            GroupAction(
+                actions=[
+                    # SetParameter overrides the node's ROS parameter directly by
+                    # name, bypassing whatever launch-argument name rs_launch.py
+                    # itself declares. This is needed because on the robot's
+                    # arm64/Jetson realsense2_camera build, the node's actual
+                    # declared parameter is "pointcloud__neon_.enable" (confirmed
+                    # via `ros2 param list /head_camera/d435`) rather than the
+                    # plain "pointcloud.enable" documented upstream — passing
+                    # "pointcloud.enable" via launch_arguments silently did
+                    # nothing since rs_launch.py's own argument name didn't match
+                    # what the compiled node expects. Setting both names here
+                    # covers whichever build is actually running (an unmatched
+                    # SetParameter name is simply unused, not an error).
+                    SetParameter(name="pointcloud.enable", value=True),
+                    SetParameter(name="pointcloud__neon_.enable", value=True),
+                    d435i_launch,
+                ]
             )
         )
 
