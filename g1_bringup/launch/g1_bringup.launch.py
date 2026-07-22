@@ -42,6 +42,8 @@ Usage:
   # upper_body_controller inactive while SONIC is in control):
   ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 \
       use_gear_sonic:=true zmq_host:=0.0.0.0
+  # With the onboard D435i camera (requires ros-jazzy-realsense2-camera):
+  ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 use_d435i:=true
 """
 
 from pathlib import Path
@@ -50,12 +52,13 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    GroupAction,
     IncludeLaunchDescription,
     OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
 from moveit_configs_utils import MoveItConfigsBuilder
 from moveit_configs_utils.launches import (
     generate_move_group_launch,
@@ -110,6 +113,7 @@ def _launch_setup(context, *args, **kwargs):
         context
     )
     head_compliance = LaunchConfiguration("head_compliance").perform(context)
+    use_d435i = LaunchConfiguration("use_d435i").perform(context).lower()
 
     cfg = _HARDWARE_CONFIG[hand_type]
 
@@ -206,6 +210,42 @@ def _launch_setup(context, *args, **kwargs):
     if use_rviz not in ("false", "0"):
         actions.extend(generate_moveit_rviz_launch(moveit_config).entities)
 
+    if use_d435i == "true":
+        realsense_share = Path(get_package_share_directory("realsense2_camera"))
+        d435i_launch = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(str(realsense_share / "launch/rs_launch.py")),
+            launch_arguments={
+                "camera_name": "d435",
+                "camera_namespace": "head_camera",
+            }.items(),
+        )
+        actions.append(
+            GroupAction(
+                actions=[
+                    # SetParameter overrides the node's ROS parameters directly by
+                    # name, bypassing whatever launch-argument name rs_launch.py
+                    # itself declares. This is needed because realsense2_camera
+                    # namespaces its pointcloud-filter parameters after the
+                    # runtime-detected SIMD backend name of librealsense's
+                    # rs2::pointcloud filter (e.g. "Pointcloud (NEON)" on
+                    # arm64/Jetson, "Pointcloud (SSE3)"/"(CUDA)" on x86_64/GPU
+                    # builds), sanitized into a prefix like "pointcloud__neon_"
+                    # (confirmed via `ros2 param list /head_camera/d435` on the
+                    # robot: params are under "pointcloud__neon_.*", not the
+                    # plain "pointcloud.*" documented/used by rs_launch.py) — so
+                    # passing values via launch_arguments silently did nothing.
+                    # Setting both the plain and "__neon_"-mangled names here
+                    # covers whichever backend is actually running (an unmatched
+                    # SetParameter name is simply unused, not an error).
+                    SetParameter(name="pointcloud.enable", value=True),
+                    SetParameter(name="pointcloud__neon_.enable", value=True),
+                    SetParameter(name="pointcloud.stream_filter", value=2),
+                    SetParameter(name="pointcloud__neon_.stream_filter", value=2),
+                    d435i_launch,
+                ]
+            )
+        )
+
     return actions
 
 
@@ -300,6 +340,12 @@ def generate_launch_description():
                     "SONIC head tracking compliance, 0.0-1.0; 0.0 = stiff "
                     "(exact tracking). Only used with use_gear_sonic:=true."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "use_d435i",
+                default_value="false",
+                choices=["true", "false"],
+                description=("Launch the onboard Intel RealSense D435i camera."),
             ),
             OpaqueFunction(function=_launch_setup),
         ]
