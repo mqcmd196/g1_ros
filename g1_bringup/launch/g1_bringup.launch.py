@@ -211,16 +211,16 @@ def _launch_setup(context, *args, **kwargs):
 
     if use_d435i == "true":
         realsense_share = Path(get_package_share_directory("realsense2_camera"))
-        # camera_name="d435" makes the driver's TF root "d435_link", matching the
-        # d435_link/d435_joint (torso_link -> d435_link) already defined in the G1
-        # URDF, so the published camera frames attach directly under the robot
-        # model with no extra static transform needed.
         actions.append(
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     str(realsense_share / "launch/rs_launch.py")
                 ),
-                launch_arguments={"camera_name": "d435"}.items(),
+                launch_arguments={
+                    "camera_name": "d435",
+                    "camera_namespace": "head_camera",
+                    "pointcloud.enable": "true",
+                }.items(),
             )
         )
 
