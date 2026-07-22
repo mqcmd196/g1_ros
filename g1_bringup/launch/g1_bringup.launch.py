@@ -222,20 +222,25 @@ def _launch_setup(context, *args, **kwargs):
         actions.append(
             GroupAction(
                 actions=[
-                    # SetParameter overrides the node's ROS parameter directly by
+                    # SetParameter overrides the node's ROS parameters directly by
                     # name, bypassing whatever launch-argument name rs_launch.py
-                    # itself declares. This is needed because on the robot's
-                    # arm64/Jetson realsense2_camera build, the node's actual
-                    # declared parameter is "pointcloud__neon_.enable" (confirmed
-                    # via `ros2 param list /head_camera/d435`) rather than the
-                    # plain "pointcloud.enable" documented upstream — passing
-                    # "pointcloud.enable" via launch_arguments silently did
-                    # nothing since rs_launch.py's own argument name didn't match
-                    # what the compiled node expects. Setting both names here
-                    # covers whichever build is actually running (an unmatched
+                    # itself declares. This is needed because realsense2_camera
+                    # namespaces its pointcloud-filter parameters after the
+                    # runtime-detected SIMD backend name of librealsense's
+                    # rs2::pointcloud filter (e.g. "Pointcloud (NEON)" on
+                    # arm64/Jetson, "Pointcloud (SSE3)"/"(CUDA)" on x86_64/GPU
+                    # builds), sanitized into a prefix like "pointcloud__neon_"
+                    # (confirmed via `ros2 param list /head_camera/d435` on the
+                    # robot: params are under "pointcloud__neon_.*", not the
+                    # plain "pointcloud.*" documented/used by rs_launch.py) — so
+                    # passing values via launch_arguments silently did nothing.
+                    # Setting both the plain and "__neon_"-mangled names here
+                    # covers whichever backend is actually running (an unmatched
                     # SetParameter name is simply unused, not an error).
                     SetParameter(name="pointcloud.enable", value=True),
                     SetParameter(name="pointcloud__neon_.enable", value=True),
+                    SetParameter(name="pointcloud.stream_filter", value=2),
+                    SetParameter(name="pointcloud__neon_.stream_filter", value=2),
                     d435i_launch,
                 ]
             )
