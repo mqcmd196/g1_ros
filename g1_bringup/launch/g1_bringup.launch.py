@@ -42,6 +42,8 @@ Usage:
   # upper_body_controller inactive while SONIC is in control):
   ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 \
       use_gear_sonic:=true zmq_host:=0.0.0.0
+  # With the onboard D435i camera (requires ros-jazzy-realsense2-camera):
+  ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 use_d435i:=true
 """
 
 from pathlib import Path
@@ -110,6 +112,7 @@ def _launch_setup(context, *args, **kwargs):
         context
     )
     head_compliance = LaunchConfiguration("head_compliance").perform(context)
+    use_d435i = LaunchConfiguration("use_d435i").perform(context).lower()
 
     cfg = _HARDWARE_CONFIG[hand_type]
 
@@ -206,6 +209,21 @@ def _launch_setup(context, *args, **kwargs):
     if use_rviz not in ("false", "0"):
         actions.extend(generate_moveit_rviz_launch(moveit_config).entities)
 
+    if use_d435i == "true":
+        realsense_share = Path(get_package_share_directory("realsense2_camera"))
+        # camera_name="d435" makes the driver's TF root "d435_link", matching the
+        # d435_link/d435_joint (torso_link -> d435_link) already defined in the G1
+        # URDF, so the published camera frames attach directly under the robot
+        # model with no extra static transform needed.
+        actions.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    str(realsense_share / "launch/rs_launch.py")
+                ),
+                launch_arguments={"camera_name": "d435"}.items(),
+            )
+        )
+
     return actions
 
 
@@ -300,6 +318,12 @@ def generate_launch_description():
                     "SONIC head tracking compliance, 0.0-1.0; 0.0 = stiff "
                     "(exact tracking). Only used with use_gear_sonic:=true."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "use_d435i",
+                default_value="false",
+                choices=["true", "false"],
+                description=("Launch the onboard Intel RealSense D435i camera."),
             ),
             OpaqueFunction(function=_launch_setup),
         ]
