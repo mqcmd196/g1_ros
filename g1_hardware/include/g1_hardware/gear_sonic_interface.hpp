@@ -77,7 +77,7 @@ namespace g1_hardware
  *       stealth_walk, injured_walk
  *
  * ── Topics ────────────────────────────────────────────────────────────────
- *   ~/cmd_vel     (geometry_msgs/Twist, subscribe)
+ *   /cmd_vel      (geometry_msgs/Twist, subscribe) — ROS standard, absolute topic
  *       linear.x  → forward speed  (m/s, robot body frame)
  *       linear.y  → strafe speed   (m/s, robot body frame, positive = left)
  *       angular.z → turn rate      (rad/s); accumulated into heading angle

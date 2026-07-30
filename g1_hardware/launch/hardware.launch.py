@@ -32,7 +32,8 @@ G1 real-hardware ROS2 driver launch.
 Starts:
   - robot_state_publisher    (URDF with g1_hardware plugin)
   - ros2_control_node        (talks to robot via DDS)
-  - loco_cmd_adapter         (accepting locomotion mode, cmd_vel)
+  - loco_cmd_adapter         (accepting locomotion mode, cmd_vel;
+                              skipped with use_gear_sonic:=true — SONIC owns /cmd_vel)
   - joint_state_broadcaster  (infrastructure: required for TF / RViz)
   - gear_sonic_interface     (optional: SONIC deploy bridge, use_gear_sonic:=true)
 
@@ -132,17 +133,21 @@ def _launch_setup(context, *args, **kwargs):
         ),
         ComposableNode(
             package="g1_hardware",
-            plugin="loco_cmd_adapter::LocoCmdAdapterNode",
-            name="loco_cmd_adapter",
-            parameters=[{"network_interface": network_interface}],
-        ),
-        ComposableNode(
-            package="g1_hardware",
             plugin="g1_hardware::G1LivoxInterfaceNode",
             name="g1_livox_interface",
             parameters=[{"network_interface": network_interface}],
         ),
     ]
+
+    if use_gear_sonic != "true":
+        composable_nodes.append(
+            ComposableNode(
+                package="g1_hardware",
+                plugin="loco_cmd_adapter::LocoCmdAdapterNode",
+                name="loco_cmd_adapter",
+                parameters=[{"network_interface": network_interface}],
+            )
+        )
 
     if use_gear_sonic == "true":
         zmq_host = LaunchConfiguration("zmq_host").perform(context)
