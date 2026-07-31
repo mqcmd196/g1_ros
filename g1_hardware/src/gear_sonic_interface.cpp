@@ -127,7 +127,7 @@ GearSonicInterface::GearSonicInterface(const rclcpp::NodeOptions& options)
   // ── Subscriptions ────────────────────────────────────────────────────────
 
   cmd_vel_sub_ = create_subscription<geometry_msgs::msg::Twist>(
-      "~/cmd_vel", 1, [this](geometry_msgs::msg::Twist::ConstSharedPtr msg) { OnCmdVel(msg); });
+      "/cmd_vel", 1, [this](geometry_msgs::msg::Twist::ConstSharedPtr msg) { OnCmdVel(msg); });
 
   // Desired base height (m); forwarded as the planner `height` field.
   // Standing default is 0.789 m (kplanner config default_height); -1 = mode default.
@@ -263,7 +263,7 @@ void GearSonicInterface::OnEnableControl(std_srvs::srv::SetBool::Request::Shared
     const auto cmd_msg = BuildCommandMessage(/*start=*/true, /*stop=*/false, /*planner=*/true);
     zmq_sock_->send(zmq::buffer(cmd_msg), zmq::send_flags::none);
     RCLCPP_INFO(get_logger(), "enable_control(true): SONIC is in control. "
-                              "Use ~/cmd_vel for locomotion, ~/mode/* for mode, "
+                              "Use /cmd_vel for locomotion, ~/mode/* for mode, "
                               "~/left_wrist + ~/right_wrist + ~/head for VR 3-point tracking.");
   } else {
     // Stop sending planner messages. Do NOT send command{stop=1}:
