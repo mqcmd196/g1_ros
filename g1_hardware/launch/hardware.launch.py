@@ -33,6 +33,7 @@ Starts:
   - robot_state_publisher    (URDF with g1_hardware plugin)
   - ros2_control_node        (talks to robot via DDS)
   - loco_cmd_adapter         (accepting locomotion mode, cmd_vel)
+  - g1_odom_interface        (Unitree DDS odometry -> ROS nav_msgs/Odometry)
   - joint_state_broadcaster  (infrastructure: required for TF / RViz)
   - gear_sonic_interface     (optional: SONIC deploy bridge, use_gear_sonic:=true)
 
@@ -140,6 +141,12 @@ def _launch_setup(context, *args, **kwargs):
             package="g1_hardware",
             plugin="g1_hardware::G1LivoxInterfaceNode",
             name="g1_livox_interface",
+            parameters=[{"network_interface": network_interface}],
+        ),
+        ComposableNode(
+            package="g1_hardware",
+            plugin="g1_hardware::G1OdomInterfaceNode",
+            name="g1_odom_interface",
             parameters=[{"network_interface": network_interface}],
         ),
     ]

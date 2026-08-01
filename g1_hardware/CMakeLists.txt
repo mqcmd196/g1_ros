@@ -71,6 +71,19 @@ rclcpp_components_register_node(g1_livox_interface
   EXECUTABLE g1_livox_interface_node
 )
 
+ament_auto_add_library(g1_odom_interface SHARED
+  src/g1_odom_interface.cpp
+)
+
+target_link_libraries(g1_odom_interface
+  unitree_sdk2
+)
+
+rclcpp_components_register_node(g1_odom_interface
+  PLUGIN "g1_hardware::G1OdomInterfaceNode"
+  EXECUTABLE g1_odom_interface_node
+)
+
 install(FILES g1_hardware_plugin.xml
   DESTINATION share/${PROJECT_NAME})
 
