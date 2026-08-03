@@ -18,7 +18,7 @@
 # systemd unit symlink is resolved on the target at boot. It defaults to this
 # playbook's parent directory, which is correct when Ansible runs on the robot.
 - name: Install g1_ros systemd services as symlinks
-  hosts: all
+  hosts: localhost
   become: true
   vars:
     g1_ros_dir: "{{ playbook_dir | dirname }}"
