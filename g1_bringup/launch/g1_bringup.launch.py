@@ -238,14 +238,16 @@ def _launch_setup(context, *args, **kwargs):
                     # covers whichever backend is actually running (an unmatched
                     # SetParameter name is simply unused, not an error).
                     SetParameter(name="color_qos", value="SENSOR_DATA"),
-                    SetParameter(name="color_info_qos", value="SENSOR_DATA"),
                     SetParameter(name="depth_qos", value="SENSOR_DATA"),
-                    SetParameter(name="depth_info_qos", value="SENSOR_DATA"),
                     SetParameter(name="pointcloud.enable", value=True),
                     SetParameter(name="pointcloud__neon_.enable", value=True),
                     SetParameter(name="pointcloud.stream_filter", value=2),
                     SetParameter(name="pointcloud__neon_.stream_filter", value=2),
                     SetParameter(name="pointcloud__neon_.ordered_pc", value=True),
+                    SetParameter(name="pointcloud.pointcloud_qos", value="SENSOR_DATA"),
+                    SetParameter(
+                        name="pointcloud__neon_.pointcloud_qos", value="SENSOR_DATA"
+                    ),
                     d435i_launch,
                 ]
             )
