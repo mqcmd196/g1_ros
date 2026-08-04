@@ -118,7 +118,7 @@ The MoveIt model additionally gains a virtual prismatic joint `pelvis_height_joi
 
 ## Running as systemd services (on the robot)
 
-The `systemd/` directory contains unit files to run the stack as services on the robot:
+The `etc/` directory mirrors the layout under `/etc` on the robot. `etc/systemd/` holds the unit files that run the stack as services:
 
 | Unit | What it runs | Autostart |
 |---|---|---|
@@ -126,14 +126,20 @@ The `systemd/` directory contains unit files to run the stack as services on the
 | `gear-sonic.service` | SONIC deploy stack (`gear_sonic_deploy/deploy.sh`) | manual |
 | `ros2-g1-gear-sonic-bringup.service` | `g1_bringup` in the `ghcr.io/mqcmd196/g1_ros` container via `rocker` | manual |
 
+`etc/sysctl/` holds kernel tuning the DDS middleware needs:
+
+| File | What it sets |
+|---|---|
+| `99-ros2-dds.conf` | large UDP socket buffers and netdev backlog (avoids dropped DDS packets, e.g. sensor data) |
+
 ### Install
 
-An Ansible playbook installs the units into `/etc/systemd/system` as **symlinks** back to the files in this repository (so editing a unit here and running `systemctl daemon-reload` is enough — no copy to keep in sync) and reloads systemd.
+An Ansible playbook installs both as **symlinks** back to the files in this repository (so editing a file here and reloading is enough — no copy to keep in sync): the units into `/etc/systemd/system` followed by `systemctl daemon-reload`, and the sysctl drop-ins into `/etc/sysctl.d` followed by `sysctl --system`.
 
 Run on the robot itself:
 
 ```shell
-ansible-playbook --ask-become-pass systemd/install.yml
+ansible-playbook --ask-become-pass etc/install.yml
 ```
 
 Or from another control node (override with the repo's absolute path **on the robot**):
@@ -141,7 +147,7 @@ Or from another control node (override with the repo's absolute path **on the ro
 ```shell
 ansible-playbook -i <robot-host>, -u unitree --become \
     -e g1_ros_dir=/home/unitree/ros/colcon_ws/src/g1_ros \
-    systemd/install.yml
+    etc/install.yml
 ```
 
 Only `inspire-g1.service` is enabled (it has an `[Install]` section). `gear-sonic.service` and `ros2-g1-gear-sonic-bringup.service` are installed but started manually.
