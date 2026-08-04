@@ -241,6 +241,7 @@ def _launch_setup(context, *args, **kwargs):
                     SetParameter(name="pointcloud__neon_.enable", value=True),
                     SetParameter(name="pointcloud.stream_filter", value=2),
                     SetParameter(name="pointcloud__neon_.stream_filter", value=2),
+                    SetParameter(name="pointcloud__neon_.ordered_pc", value=True),
                     d435i_launch,
                 ]
             )
