@@ -18,7 +18,7 @@ Visualization Manager:
       Planning Request:
         Planning Group: both_arms_with_waist
       Planned Path:
-        Loop Animation: true
+        Loop Animation: false
         State Display Time: 0.05 s
         Trajectory Topic: display_planned_path
       Planning Scene Topic: monitored_planning_scene
