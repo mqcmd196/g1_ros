@@ -31,6 +31,7 @@ Then launch the nodes.
 
 ```shell
 source <colcon workspace>/install/setup.bash
+export FASTDDS_BUILTIN_TRANSPORTS=LARGE_DATA # This requires for publishing/subscribing large data like PointCloud
 ros2 launch g1_bringup g1_bringup.launch.py network_interface:=<network interface name> use_d435i:=true # if you want to use d435i on the G1
 ```
 
