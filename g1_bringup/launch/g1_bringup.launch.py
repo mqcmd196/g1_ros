@@ -42,7 +42,6 @@ Usage:
   # upper_body_controller inactive while SONIC is in control):
   ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 \
       use_gear_sonic:=true zmq_host:=0.0.0.0
-  # With the onboard D435i camera (requires ros-jazzy-realsense2-camera):
   ros2 launch g1_bringup g1_bringup.launch.py network_interface:=eth0 use_d435i:=true
 """
 
@@ -65,6 +64,10 @@ from moveit_configs_utils.launches import (
     generate_moveit_rviz_launch,
     generate_static_virtual_joint_tfs_launch,
 )
+
+_D435I_NAME = "d435"
+_D435I_NAMESPACE = "head_camera"
+_D435I_POINTS_TOPIC = f"/{_D435I_NAMESPACE}/{_D435I_NAME}/depth/color/points"
 
 _HARDWARE_CONFIG = {
     "no_hand": {
@@ -215,8 +218,8 @@ def _launch_setup(context, *args, **kwargs):
         d435i_launch = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(str(realsense_share / "launch/rs_launch.py")),
             launch_arguments={
-                "camera_name": "d435",
-                "camera_namespace": "head_camera",
+                "camera_name": _D435I_NAME,
+                "camera_namespace": _D435I_NAMESPACE,
             }.items(),
         )
         actions.append(
@@ -250,6 +253,24 @@ def _launch_setup(context, *args, **kwargs):
                     ),
                     d435i_launch,
                 ]
+            )
+        )
+
+        actions.append(
+            Node(
+                package="point_cloud_transport",
+                executable="republish",
+                name="d435_points_republisher",
+                parameters=[
+                    {
+                        "in_transport": "raw",
+                        "out_transport": "zstd",
+                    }
+                ],
+                remappings=[
+                    ("in", _D435I_POINTS_TOPIC),
+                    ("out/zstd", f"{_D435I_POINTS_TOPIC}/zstd"),
+                ],
             )
         )
 

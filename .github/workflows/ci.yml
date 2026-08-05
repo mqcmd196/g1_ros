@@ -17,9 +17,9 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-latest
-            rosdep_skip_keys: catkin g1_description gazebo message_generation message_runtime roscpp roslaunch rviz unitree_sdk2
+            rosdep_skip_keys: catkin g1_description gazebo joint_state_publisher_gui message_generation message_runtime roscpp roslaunch rviz unitree_sdk2
           - runner: ubuntu-24.04-arm
-            rosdep_skip_keys: catkin g1_description gazebo message_generation message_runtime roscpp roslaunch rviz unitree_sdk2 moveit_ros_control_interface
+            rosdep_skip_keys: catkin g1_description gazebo joint_state_publisher_gui message_generation message_runtime moveit_ros_control_interface roscpp roslaunch rviz unitree_sdk2
     permissions:
       contents: read
       packages: write
