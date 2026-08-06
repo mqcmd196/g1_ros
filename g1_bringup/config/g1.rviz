@@ -28,6 +28,44 @@ Visualization Manager:
       Scene Robot:
         Robot Alpha: 0.5
       Value: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: D435i PointCloud (zstd)
+      Color Transformer: RGB8
+      Size (Pixels): 3
+      Size (m): 0.01
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /head_camera/d435/depth/color/points/zstd
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Name: D435i Color (compressed)
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /head_camera/d435/color/image_raw/compressed
+      Value: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Livox Mid-360
+      Axis: Z
+      Color Transformer: AxisColor
+      Size (Pixels): 2
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /livox/lidar
+      Value: true
   Global Options:
     Fixed Frame: pelvis
   Tools:
@@ -48,6 +86,10 @@ Visualization Manager:
       Target Frame: pelvis
       Yaw: 2.519
 Window Geometry:
+  D435i Color (compressed):
+    collapsed: false
+  Displays:
+    collapsed: false
   Height: 975
   QMainWindow State: 000000ff00000000fd0000000100000000000002b400000375fc0200000005fb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000004100fffffffb000000100044006900730070006c006100790073010000003d00000123000000c900fffffffb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e00670000000166000001910000018800fffffffb0000000800480065006c0070000000029a0000006e0000006e00fffffffb0000000a0056006900650077007301000002fd000000b5000000a400ffffff000001f60000037500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Width: 1200
