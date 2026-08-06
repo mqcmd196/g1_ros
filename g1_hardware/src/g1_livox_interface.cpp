@@ -56,8 +56,11 @@ G1LivoxInterfaceNode::G1LivoxInterfaceNode(const rclcpp::NodeOptions& options)
             static_cast<const sensor_msgs::msg::dds_::PointCloud2_*>(msg);
         frame_id_ = lidar_msg->header().frame_id();
         const auto ros_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
-        ros_msg->header.stamp.sec = lidar_msg->header().stamp().sec();
-        ros_msg->header.stamp.nanosec = lidar_msg->header().stamp().nanosec();
+        // Stamp on reception instead of copying the DDS stamp: the robot-side
+        // utlidar service stamps the Livox data more than 20 minutes behind
+        // this host's clock (the offset survives a robot reboot), which puts
+        // every lookup far outside the tf2 buffer.
+        ros_msg->header.stamp = now();
         ros_msg->header.frame_id = frame_id_;
         ros_msg->height = lidar_msg->height();
         ros_msg->width = lidar_msg->width();
@@ -88,8 +91,7 @@ G1LivoxInterfaceNode::G1LivoxInterfaceNode(const rclcpp::NodeOptions& options)
         const sensor_msgs::msg::dds_::Imu_* imu_msg =
             static_cast<const sensor_msgs::msg::dds_::Imu_*>(msg);
         const auto ros_msg = std::make_shared<sensor_msgs::msg::Imu>();
-        ros_msg->header.stamp.sec = imu_msg->header().stamp().sec();
-        ros_msg->header.stamp.nanosec = imu_msg->header().stamp().nanosec();
+        ros_msg->header.stamp = now();
         ros_msg->header.frame_id = frame_id_;
         ros_msg->orientation.x = imu_msg->orientation().x();
         ros_msg->orientation.y = imu_msg->orientation().y();
