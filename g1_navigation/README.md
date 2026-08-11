@@ -38,6 +38,11 @@ Send goals from RViz2 (Nav2 panel) or the `navigate_to_pose` action.
 
 ## Deps
 
-`nav2_*`, `pointcloud_to_laserscan` come from apt (rosdep). `fast_lio` and
-`livox_ros_driver2` are source deps — see the workspace `jazzy.repos.yaml`
-(and `.github/upstream.jazzy.repos` for CI).
+`nav2_*`, `pointcloud_to_laserscan` come from apt (rosdep). `fast_lio` is a
+source dep — see the workspace `jazzy.repos.yaml` (and
+`.github/upstream.jazzy.repos` for CI).
+
+Lidar is taken as `sensor_msgs/PointCloud2` from `/livox/lidar` (unitree
+`g1_livox_interface`), so no livox driver is needed. Use a PointCloud2-capable
+FAST-LIO fork that does not depend on `livox_ros_driver2` (the upstream livox
+driver ships a ROS 1 `package.xml` and does not colcon build cleanly).

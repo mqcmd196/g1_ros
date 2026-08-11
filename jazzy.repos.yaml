@@ -12,11 +12,9 @@ repositories:
     url: git@github.com:mqcmd196/unitree_sdk2.git
     version: add-package-xml
   # g1_navigation odometry (FAST-LIO2); not released, build from source.
+  # Lidar is consumed as sensor_msgs/PointCloud2 from /livox/lidar
+  # (unitree g1_livox_interface), so no livox driver / CustomMsg is needed.
   Ericsii/FAST_LIO:
     type: git
     url: https://github.com/Ericsii/FAST_LIO.git
     version: ros2
-  Livox-SDK/livox_ros_driver2:
-    type: git
-    url: https://github.com/Livox-SDK/livox_ros_driver2.git
-    version: master
