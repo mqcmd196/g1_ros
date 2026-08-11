@@ -70,6 +70,7 @@ jobs:
       - uses: ros-industrial/industrial_ci@master
         env:
           ROS_DISTRO: jazzy
+          ROS_REPO: main
           UPSTREAM_WORKSPACE: .github/upstream.jazzy.repos
           UPSTREAM_CMAKE_ARGS: --packages-select g1_description unitree_sdk2
           ROSDEP_SKIP_KEYS: ${{ matrix.rosdep_skip_keys }}
