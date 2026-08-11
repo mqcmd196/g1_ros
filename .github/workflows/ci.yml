@@ -26,8 +26,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Compute image tags and whether to push
+        id: meta
+        run: |
+          # master -> ':latest'; PR -> ':<branch>' and ':<sha7>' (two tags).
+          # docker tags only allow [A-Za-z0-9_.-] and no '/', so sanitize the branch.
+          image="${REGISTRY}/${IMAGE_NAME}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            branch="$(printf '%s' "${{ github.head_ref }}" | sed -e 's#[^A-Za-z0-9.-]#-#g' -e 's#^[.-]*##')"
+            [ -z "$branch" ] && branch="pr"
+            sha="${{ github.event.pull_request.head.sha }}"
+            tags="${image}:${branch:0:100} ${image}:${sha:0:7}"
+          else
+            tags="${image}:latest"
+          fi
+
+          # Build the image on arm only; publish on master pushes and same-repo PRs.
+          docker_commit=""
+          push=false
+          if [ "${{ matrix.runner }}" = "ubuntu-24.04-arm" ]; then
+            docker_commit="${tags%% *}"
+            if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/master" ]; then
+              push=true
+            elif [ "${{ github.event_name }}" = "pull_request" ] && \
+                 [ "${{ github.event.pull_request.head.repo.full_name }}" = "${{ github.repository }}" ]; then
+              push=true
+            fi
+          fi
+
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+          echo "docker_commit=${docker_commit}" >> "$GITHUB_OUTPUT"
+          echo "push=${push}" >> "$GITHUB_OUTPUT"
+          echo "tags=[${tags}] push=${push}"
+
       - name: Log in to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && matrix.runner == 'ubuntu-24.04-arm'
+        if: steps.meta.outputs.push == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -37,11 +70,17 @@ jobs:
       - uses: ros-industrial/industrial_ci@master
         env:
           ROS_DISTRO: jazzy
+          ROS_REPO: main
           UPSTREAM_WORKSPACE: .github/upstream.jazzy.repos
           UPSTREAM_CMAKE_ARGS: --packages-select g1_description unitree_sdk2
           ROSDEP_SKIP_KEYS: ${{ matrix.rosdep_skip_keys }}
-          DOCKER_COMMIT: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          DOCKER_COMMIT: ${{ steps.meta.outputs.docker_commit }}
 
       - name: Push image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && matrix.runner == 'ubuntu-24.04-arm'
-        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        if: steps.meta.outputs.push == 'true'
+        run: |
+          primary="${{ steps.meta.outputs.docker_commit }}"
+          for t in ${{ steps.meta.outputs.tags }}; do
+            [ "$t" = "$primary" ] || docker tag "$primary" "$t"
+            docker push "$t"
+          done
