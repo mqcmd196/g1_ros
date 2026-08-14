@@ -1,7 +1,7 @@
 [Unit]
 Description=Unitree G1 ROS 2 Gear Sonic Bringup
-Requires=docker.service gear-sonic.service
-After=docker.service gear-sonic.service
+Requires=docker.service gear-sonic.service inspire-g1.service
+After=docker.service gear-sonic.service inspire-g1.service
 
 [Service]
 Type=simple
