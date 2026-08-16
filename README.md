@@ -123,8 +123,8 @@ The `etc/` directory mirrors the layout under `/etc` on the robot. `etc/systemd/
 
 | Unit | What it runs | Autostart |
 |---|---|---|
-| `inspire-g1.service` | Inspire RH56DFX hand service (`inspire_g1`) | enabled (starts on boot) |
-| `gear-sonic.service` | SONIC deploy stack (`gear_sonic_deploy/deploy.sh`) | manual |
+| `inspire-g1.service` | Inspire RH56DFX hand service (`inspire_g1`) | disabled (pulled in by the bringup) |
+| `gear-sonic.service` | SONIC deploy stack (`gear_sonic_deploy/deploy.sh`) | disabled (pulled in by the bringup) |
 | `ros2-g1-gear-sonic-bringup.service` | `g1_bringup` in the `ghcr.io/mqcmd196/g1_ros` container via `rocker` | manual |
 
 `etc/sysctl/` holds kernel tuning the DDS middleware needs:
@@ -151,15 +151,15 @@ ansible-playbook -i <robot-host>, -u unitree --become \
     etc/install.yml
 ```
 
-Only `inspire-g1.service` is enabled (it has an `[Install]` section). `gear-sonic.service` and `ros2-g1-gear-sonic-bringup.service` are installed but started manually.
+No unit autostarts at boot. `ros2-g1-gear-sonic-bringup.service` pulls in `gear-sonic.service` and `inspire-g1.service` via `Requires=`, so starting the bringup starts all three.
 
 ### Start / stop
 
 ```shell
-# Start SONIC + the ROS bringup (the bringup pulls in gear-sonic via Requires=)
+# Start SONIC + Inspire hand + the ROS bringup (pulled in via Requires=)
 sudo systemctl start ros2-g1-gear-sonic-bringup
 # Stop
-sudo systemctl stop ros2-g1-gear-sonic-bringup gear-sonic
+sudo systemctl stop ros2-g1-gear-sonic-bringup gear-sonic inspire-g1
 # Follow logs
 journalctl -u ros2-g1-gear-sonic-bringup -f
 journalctl -u gear-sonic -f
