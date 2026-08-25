@@ -8,7 +8,8 @@ map, driving the robot through `/cmd_vel` (the gear_sonic locomotion bridge).
 ```
 map ──AMCL──> odom ──FAST-LIO2──> base_link ──static──> pelvis ──> (robot TF: torso, livox_frame, legs…)
  (2D scan match)     (LIO odometry)            (base_link->pelvis)
-/livox/lidar ─pointcloud_to_laserscan─> /scan  (AMCL + costmap obstacle layer)
+/livox/lidar (PointCloud2, unitree) ─pointcloud_to_laserscan─> /scan  (AMCL + costmap obstacle layer)
+/livox/lidar_custom (CustomMsg, livox_driver) ──> FAST-LIO2
 nav2 (costmaps[static=2D map, obstacle=/scan] + planner + RPP controller + bt) ──> /cmd_vel ──> gear_sonic
 ```
 
@@ -36,13 +37,19 @@ ros2 launch g1_navigation g1_navigation.launch.py map:=/path/to/map.yaml use_fas
 
 Send goals from RViz2 (Nav2 panel) or the `navigate_to_pose` action.
 
+## Livox CustomMsg (FAST-LIO input)
+
+FAST-LIO uses `livox_ros_driver2/CustomMsg` (`lidar_type=1`), whose per-point
+timestamps beat PointCloud2 for odometry. Publish it on dedicated topics
+(`/livox/lidar_custom`, `/livox/imu_custom`) so it coexists with unitree's
+PointCloud2 `/livox/lidar` (which still feeds the scan bridge):
+
+```bash
+ros2 launch g1_navigation livox_driver.launch.py   # edit config/mid360.json IPs first
+```
+
 ## Deps
 
-`nav2_*`, `pointcloud_to_laserscan` come from apt (rosdep). `fast_lio` is a
-source dep — see the workspace `jazzy.repos.yaml` (and
-`.github/upstream.jazzy.repos` for CI).
-
-Lidar is taken as `sensor_msgs/PointCloud2` from `/livox/lidar` (unitree
-`g1_livox_interface`), so no livox driver is needed. Use a PointCloud2-capable
-FAST-LIO fork that does not depend on `livox_ros_driver2` (the upstream livox
-driver ships a ROS 1 `package.xml` and does not colcon build cleanly).
+`nav2_*`, `pointcloud_to_laserscan` come from apt (rosdep). `fast_lio`,
+`livox_ros_driver2` (tu-darmstadt fork) and `livox_sdk2` are source deps — see
+the workspace `jazzy.repos.yaml` (and `.github/upstream.jazzy.repos` for CI).

@@ -1,12 +1,12 @@
 /**:
   ros__parameters:
     # FAST-LIO2 odometry for Livox mid360 + built-in IMU.
-    # Input is sensor_msgs/PointCloud2 (unitree g1_livox_interface), NOT Livox
-    # CustomMsg -> use a PointCloud2-capable FAST-LIO fork (no livox_ros_driver2).
-    # Publishes odom -> base_link (see frames below). Tune to your fork.
+    # Input is livox_ros_driver2/CustomMsg (lidar_type=1) from
+    # livox_driver.launch.py, on dedicated topics (unitree keeps /livox/lidar
+    # PointCloud2 for the scan bridge). Publishes odom -> base_link.
     common:
-      lid_topic: /livox/lidar   # sensor_msgs/PointCloud2
-      imu_topic: /livox/imu
+      lid_topic: /livox/lidar_custom   # livox_ros_driver2/msg/CustomMsg
+      imu_topic: /livox/imu_custom
       con_frame: false
       con_frame_num: 1
       cut_frame: false
