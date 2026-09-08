@@ -54,15 +54,40 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    LogInfo,
+    OpaqueFunction,
+)
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node, SetParameter
+import yaml
 
 _D435I_BASE = "/head_camera/d435"
 _D435I_COLOR_TOPIC = f"{_D435I_BASE}/color/image_raw"
 _D435I_DEPTH_TOPIC = f"{_D435I_BASE}/depth/image_rect_raw"
 _D435I_POINTS_TOPIC = f"{_D435I_BASE}/depth/color/points"
 _LIVOX_POINTS_TOPIC = "/livox/lidar"
+
+
+def _bag_topics(bag):
+    """
+    Return the set of topic names stored in the bag.
+
+    Returns None when the bag's metadata cannot be read (e.g. a bare .mcap
+    file was passed instead of a bag directory), so callers can fall back to
+    assuming every stream might be present.
+    """
+    metadata = Path(bag) / "metadata.yaml"
+    if not metadata.is_file():
+        return None
+    try:
+        info = yaml.safe_load(metadata.read_text())
+        topics = info["rosbag2_bagfile_information"]["topics_with_message_count"]
+        return {entry["topic_metadata"]["name"] for entry in topics}
+    except (AttributeError, KeyError, TypeError, yaml.YAMLError):
+        return None
 
 
 def _image_decompressor(name, raw_topic, transport):
@@ -133,16 +158,49 @@ def _launch_setup(context, *args, **kwargs):
 
     actions = []
     if flag("decompress"):
-        actions += [
-            _image_decompressor(
-                "d435_color_decompressor", _D435I_COLOR_TOPIC, "compressed"
+        candidates = [
+            (
+                f"{_D435I_COLOR_TOPIC}/compressed",
+                lambda: _image_decompressor(
+                    "d435_color_decompressor", _D435I_COLOR_TOPIC, "compressed"
+                ),
             ),
-            _image_decompressor(
-                "d435_depth_decompressor", _D435I_DEPTH_TOPIC, "compressedDepth"
+            (
+                f"{_D435I_DEPTH_TOPIC}/compressedDepth",
+                lambda: _image_decompressor(
+                    "d435_depth_decompressor", _D435I_DEPTH_TOPIC, "compressedDepth"
+                ),
             ),
-            _points_decompressor("d435_points_decompressor", _D435I_POINTS_TOPIC),
-            _points_decompressor("livox_points_decompressor", _LIVOX_POINTS_TOPIC),
+            (
+                f"{_D435I_POINTS_TOPIC}/zstd",
+                lambda: _points_decompressor(
+                    "d435_points_decompressor", _D435I_POINTS_TOPIC
+                ),
+            ),
+            (
+                f"{_LIVOX_POINTS_TOPIC}/zstd",
+                lambda: _points_decompressor(
+                    "livox_points_decompressor", _LIVOX_POINTS_TOPIC
+                ),
+            ),
         ]
+        # Only decompress what the bag holds. A republish node advertises its
+        # output topic even with no input, so starting all of them would make
+        # e.g. /head_camera/d435/color/image_raw appear in `ros2 topic list`
+        # and in RViz's topic dropdown while never carrying a single message.
+        bag_topics = _bag_topics(bag)
+        missing = []
+        for in_topic, make_node in candidates:
+            if bag_topics is None or in_topic in bag_topics:
+                actions.append(make_node())
+            else:
+                missing.append(in_topic)
+        if missing:
+            actions.append(
+                LogInfo(
+                    msg=("not in the bag, so not decompressed: " + " ".join(missing))
+                )
+            )
 
     # Only reaches the republishers above; other nodes need their own
     # use_sim_time:=true to follow the bag clock.
