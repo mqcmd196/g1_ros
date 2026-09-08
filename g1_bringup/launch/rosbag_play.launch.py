@@ -29,10 +29,18 @@
 """
 Play back a rosbag recorded by rosbag_record.launch.py.
 
-Bags hold the transport-compressed sensor streams, so by default this launch
-also starts `republish` nodes that decode them back to the raw topics
-(sensor_msgs/Image, sensor_msgs/PointCloud2) that downstream nodes and RViz
-expect. Set decompress:=false to replay only what is in the bag.
+The bag stores the bandwidth-heavy sensor streams in their transport-
+compressed form and they are replayed as-is; nothing is decompressed here.
+Consumers subscribe through image_transport / point_cloud_transport, which
+pick the transport from the topic name, so they get the raw message without
+an extra republisher in between. RViz needs no help: rviz_default_plugins
+depends on both libraries, and its Image and PointCloud2 displays subscribe
+to .../compressed and .../zstd natively (verified against a running RViz).
+
+Bags recorded with record_points:=false hold no D435i cloud; for those the
+cloud is rebuilt here from the depth and color images. That is the one case
+where something is decompressed, because depth_image_proc subscribes to the
+raw images rather than through image_transport.
 
 Do not run this against the live robot: the bag republishes /joint_states,
 /tf and /robot_description, which would fight the real robot_state_publisher.
@@ -61,7 +69,8 @@ from launch.actions import (
     OpaqueFunction,
 )
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node, SetParameter
+from launch_ros.actions import ComposableNodeContainer, Node, SetParameter
+from launch_ros.descriptions import ComposableNode
 import yaml
 
 _D435I_BASE = "/head_camera/d435"
@@ -91,7 +100,14 @@ def _bag_topics(bag):
 
 
 def _image_decompressor(name, raw_topic, transport):
-    """Decode an image_transport-compressed topic back to sensor_msgs/Image."""
+    """
+    Decode an image_transport-compressed topic back to sensor_msgs/Image.
+
+    Only used to feed the reconstruction below: depth_image_proc subscribes to
+    the raw images, and a bag holds only the compressed ones. Unlike the
+    ~6 MB point cloud, these decode at the full bag rate (measured 183 of 183
+    frames on both streams).
+    """
     return Node(
         package="image_transport",
         executable="republish",
@@ -104,17 +120,59 @@ def _image_decompressor(name, raw_topic, transport):
     )
 
 
-def _points_decompressor(name, raw_topic):
-    """Decode a zstd point cloud back to sensor_msgs/PointCloud2."""
-    return Node(
-        package="point_cloud_transport",
-        executable="republish",
-        name=name,
-        parameters=[{"in_transport": "zstd", "out_transport": "raw"}],
-        remappings=[
-            ("in/zstd", f"{raw_topic}/zstd"),
-            ("out", raw_topic),
+def _points_reconstruction():
+    """
+    Rebuild an approximate D435i colored cloud from the depth and color images.
+
+    Used for bags recorded with record_points:=false. This is not what the
+    robot published: librealsense keeps the full, wider depth FOV and samples
+    color per point, whereas registering depth into the color frame drops
+    everything outside the narrower color FOV -- measured 119k of 242k points
+    -- and yields frame_id d435_color_optical_frame rather than
+    d435_depth_optical_frame. The two frames differ by the recorded static
+    transform (15 mm in x), so the geometry is consistent once TF is applied.
+
+    Both nodes share one container with intra-process comms, which keeps the
+    intermediate registered depth image from being serialized.
+    """
+    color_info = f"{_D435I_BASE}/color/camera_info"
+    registered = f"{_D435I_BASE}/depth_registered/image_rect"
+    return ComposableNodeContainer(
+        name="d435_points_reconstruction",
+        namespace="",
+        package="rclcpp_components",
+        executable="component_container_mt",
+        composable_node_descriptions=[
+            ComposableNode(
+                package="depth_image_proc",
+                plugin="depth_image_proc::RegisterNode",
+                name="d435_depth_register",
+                remappings=[
+                    ("rgb/camera_info", color_info),
+                    ("depth/camera_info", f"{_D435I_BASE}/depth/camera_info"),
+                    ("depth/image_rect", _D435I_DEPTH_TOPIC),
+                    (
+                        "depth_registered/camera_info",
+                        f"{_D435I_BASE}/depth_registered/camera_info",
+                    ),
+                    ("depth_registered/image_rect", registered),
+                ],
+                extra_arguments=[{"use_intra_process_comms": True}],
+            ),
+            ComposableNode(
+                package="depth_image_proc",
+                plugin="depth_image_proc::PointCloudXyzrgbNode",
+                name="d435_points_xyzrgb",
+                remappings=[
+                    ("rgb/camera_info", color_info),
+                    ("rgb/image_rect_color", _D435I_COLOR_TOPIC),
+                    ("depth_registered/image_rect", registered),
+                    ("points", _D435I_POINTS_TOPIC),
+                ],
+                extra_arguments=[{"use_intra_process_comms": True}],
+            ),
         ],
+        output="screen",
     )
 
 
@@ -157,53 +215,38 @@ def _launch_setup(context, *args, **kwargs):
         cmd += ["--qos-profile-overrides-path", qos_overrides]
 
     actions = []
-    if flag("decompress"):
-        candidates = [
-            (
-                f"{_D435I_COLOR_TOPIC}/compressed",
-                lambda: _image_decompressor(
+
+    # Bags recorded with record_points:=false hold no cloud; rebuild an
+    # approximation from the images. See _points_reconstruction().
+    bag_topics = _bag_topics(bag)
+    if bag_topics is not None:
+        have_images = {
+            f"{_D435I_COLOR_TOPIC}/compressed",
+            f"{_D435I_DEPTH_TOPIC}/compressedDepth",
+        } <= bag_topics
+        if have_images and f"{_D435I_POINTS_TOPIC}/zstd" not in bag_topics:
+            actions += [
+                _image_decompressor(
                     "d435_color_decompressor", _D435I_COLOR_TOPIC, "compressed"
                 ),
-            ),
-            (
-                f"{_D435I_DEPTH_TOPIC}/compressedDepth",
-                lambda: _image_decompressor(
+                _image_decompressor(
                     "d435_depth_decompressor", _D435I_DEPTH_TOPIC, "compressedDepth"
                 ),
-            ),
-            (
-                f"{_D435I_POINTS_TOPIC}/zstd",
-                lambda: _points_decompressor(
-                    "d435_points_decompressor", _D435I_POINTS_TOPIC
-                ),
-            ),
-            (
-                f"{_LIVOX_POINTS_TOPIC}/zstd",
-                lambda: _points_decompressor(
-                    "livox_points_decompressor", _LIVOX_POINTS_TOPIC
-                ),
-            ),
-        ]
-        # Only decompress what the bag holds. A republish node advertises its
-        # output topic even with no input, so starting all of them would make
-        # e.g. /head_camera/d435/color/image_raw appear in `ros2 topic list`
-        # and in RViz's topic dropdown while never carrying a single message.
-        bag_topics = _bag_topics(bag)
-        missing = []
-        for in_topic, make_node in candidates:
-            if bag_topics is None or in_topic in bag_topics:
-                actions.append(make_node())
-            else:
-                missing.append(in_topic)
-        if missing:
+                _points_reconstruction(),
+            ]
             actions.append(
                 LogInfo(
-                    msg=("not in the bag, so not decompressed: " + " ".join(missing))
+                    msg=(
+                        "no recorded cloud; rebuilding "
+                        + _D435I_POINTS_TOPIC
+                        + " from the depth and color images (approximate: "
+                        + "color FOV only, d435_color_optical_frame)"
+                    )
                 )
             )
 
-    # Only reaches the republishers above; other nodes need their own
-    # use_sim_time:=true to follow the bag clock.
+    # Only reaches the reconstruction container above; other nodes need
+    # their own use_sim_time:=true to follow the bag clock.
     if clock:
         actions.insert(0, SetParameter(name="use_sim_time", value=True))
 
@@ -258,21 +301,13 @@ def generate_launch_description():
                 description="Space-separated subset of topics to play; empty plays all",
             ),
             DeclareLaunchArgument(
-                "decompress",
-                default_value="true",
-                choices=["true", "false"],
-                description=(
-                    "Republish the compressed image and point-cloud topics as "
-                    "raw sensor_msgs, for nodes and RViz that need them"
-                ),
-            ),
-            DeclareLaunchArgument(
                 "qos_overrides",
                 default_value=default_qos_overrides,
                 description=(
-                    "rosbag2 QoS override file. The default republishes the "
-                    "sensor topics as reliable so the decompress nodes, whose "
-                    "subscribers are reliable, actually receive them"
+                    "rosbag2 QoS override file. The default replays the sensor "
+                    "topics as reliable, which any subscriber accepts; "
+                    "best_effort as recorded would be refused by a "
+                    "default-QoS (reliable) subscriber"
                 ),
             ),
             OpaqueFunction(function=_launch_setup),

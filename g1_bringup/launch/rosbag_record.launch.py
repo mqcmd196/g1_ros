@@ -44,7 +44,14 @@ robot (D435i 640x480, MID-360):
                     .../zstd                       2.4  MB/s
 
 Total is roughly 15 MB/s, i.e. ~53 GB per hour, of which the D435i point
-cloud is ~11.7 MB/s.
+cloud is ~11.7 MB/s; record_points:=false drops it to ~5.5 MB/s and lets
+rosbag_play.launch.py rebuild an approximate cloud instead.
+
+Note that a recorded cloud replays poorly: point_cloud_transport's zstd
+decompressor delivers only 0-3 Hz of the 6.8 Hz in the bag, in bursts. Use
+record_points:=false if the cloud is meant to be watched in RViz, and
+record_points:=true only when the exact cloud the robot published matters
+more than smooth playback.
 
 Action feedback and status are included, so a bag shows which MoveIt and
 FollowJointTrajectory goals ran and how they ended. Goals and results
@@ -54,6 +61,7 @@ the action servers, which this stack does not do.
 Usage:
   ros2 launch g1_bringup rosbag_record.launch.py
   ros2 launch g1_bringup rosbag_record.launch.py output:=/home/unitree/bags/pick_demo
+  ros2 launch g1_bringup rosbag_record.launch.py record_points:=false
 
 Stop the recording with Ctrl-C: launch forwards SIGINT to `ros2 bag record`,
 which closes the bag cleanly.
@@ -66,6 +74,21 @@ from launch_ros.actions import Node
 
 _D435I_BASE = "/head_camera/d435"
 _LIVOX_POINTS_TOPIC = "/livox/lidar"
+
+# Recorded only with record_points:=true (~11.7 MB/s, ~80% of the bag).
+# Recording it is the only way to reproduce what the robot publishes:
+# librealsense keeps the full, wider depth FOV and samples color per point,
+# while rebuilding on playback has to reproject depth into the color frame,
+# which drops everything outside the narrower color FOV -- measured 119k of
+# 242k points, in d435_color_optical_frame instead of
+# d435_depth_optical_frame. zstd is lossless, so replaying this topic gives
+# byte-identical clouds. With record_points:=false,
+# rosbag_play.launch.py rebuilds an approximation instead.
+#
+# g1_bringup.launch.py already republishes this to zstd when use_d435i:=true,
+# so this launch must not start a second republisher for it: two publishers
+# on one topic would put every cloud into the bag twice.
+_D435I_POINTS_ZSTD_TOPIC = f"{_D435I_BASE}/depth/color/points/zstd"
 
 # Action goal/result live on services; only feedback and status are topics.
 # They are hidden topics, hence --include-hidden-topics below.
@@ -105,19 +128,6 @@ _TOPICS = [
     f"{_D435I_BASE}/extrinsics/depth_to_color",
     f"{_D435I_BASE}/color/image_raw/compressed",
     f"{_D435I_BASE}/depth/image_rect_raw/compressedDepth",
-    # The cloud is recorded rather than rebuilt on playback. Rebuilding it
-    # from depth cannot reproduce what the robot publishes: librealsense
-    # keeps the full (wider) depth FOV and samples color per point, while
-    # depth_image_proc has to reproject depth into the color frame, which
-    # drops everything outside the narrower color FOV -- measured 119k of
-    # 242k points, and in d435_color_optical_frame instead of
-    # d435_depth_optical_frame. zstd is lossless, so replaying this topic
-    # gives byte-identical clouds.
-    #
-    # g1_bringup.launch.py already republishes this to zstd when
-    # use_d435i:=true, so we must not start a second republisher: two
-    # publishers on one topic would put every cloud into the bag twice.
-    f"{_D435I_BASE}/depth/color/points/zstd",
     # Livox MID-360. Nothing else in the stack produces /livox/lidar/zstd,
     # so this launch runs that republisher below.
     "/livox/imu",
@@ -161,7 +171,11 @@ def _launch_setup(context, *args, **kwargs):
     if output:
         cmd += ["--output", output]
 
-    cmd += ["--topics"] + _TOPICS
+    topics = list(_TOPICS)
+    if LaunchConfiguration("record_points").perform(context).lower() in ("true", "1"):
+        topics.append(_D435I_POINTS_ZSTD_TOPIC)
+
+    cmd += ["--topics"] + topics
 
     livox_republisher = Node(
         package="point_cloud_transport",
@@ -180,6 +194,16 @@ def _launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "record_points",
+                default_value="true",
+                choices=["true", "false"],
+                description=(
+                    "Record the D435i point cloud (~11.7 MB/s, ~80% of the "
+                    "bag). With false, rosbag_play.launch.py rebuilds an "
+                    "approximation from the depth and color images instead"
+                ),
+            ),
             DeclareLaunchArgument(
                 "output",
                 default_value="",
