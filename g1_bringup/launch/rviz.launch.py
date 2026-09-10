@@ -32,7 +32,15 @@ Standalone RViz for an already-running G1 stack.
 Runs g1_moveit_config/moveit_rviz.launch.py (the MotionPlanning display and its
 MoveIt parameters) with a config that adds the onboard sensors on top of the
 MoveIt displays: the zstd-compressed D435i point cloud, the compressed D435i
-color image and the Livox Mid-360 cloud.
+color image and the Livox Mid-360 cloud. RViz subscribes to the compressed
+topics directly (rviz_default_plugins depends on image_transport and
+point_cloud_transport), so nothing has to be decompressed for it.
+
+Two extra displays ship disabled, for the topic forms that only exist during
+rosbag playback: the rebuilt cloud on /head_camera/d435/depth/color/points
+(bags recorded with record_points:=false) and /livox/lidar/zstd. Enable them
+when playing a bag; enabled against the live robot, the raw cloud alone would
+pull ~89 MB/s. A disabled display creates no subscription and costs nothing.
 
 The rest of the stack (g1_bringup.launch.py or hardware.launch.py, which
 publish /robot_description, TF and the sensor topics) must already be running;

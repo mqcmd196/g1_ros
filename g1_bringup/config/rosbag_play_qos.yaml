@@ -1,0 +1,42 @@
+# QoS overrides for `ros2 bag play` (see rosbag_play.launch.py).
+#
+# The sensor topics were recorded best_effort, which default (reliable)
+# subscribers such as the `republish` nodes would refuse. Replaying them
+# reliable matches both sides: reliable publisher -> best_effort subscriber
+# is a valid pairing, so SENSOR_DATA subscribers still work too.
+/head_camera/d435/color/image_raw:
+  reliability: reliable
+  history: keep_last
+  depth: 10
+/head_camera/d435/color/image_raw/compressed:
+  reliability: reliable
+  history: keep_last
+  depth: 10
+/head_camera/d435/depth/image_rect_raw:
+  reliability: reliable
+  history: keep_last
+  depth: 10
+/head_camera/d435/depth/image_rect_raw/compressedDepth:
+  reliability: reliable
+  history: keep_last
+  depth: 10
+/head_camera/d435/depth/color/points:
+  reliability: reliable
+  history: keep_last
+  depth: 5
+/head_camera/d435/depth/color/points/zstd:
+  reliability: reliable
+  history: keep_last
+  depth: 5
+/livox/lidar:
+  reliability: reliable
+  history: keep_last
+  depth: 5
+/livox/lidar/zstd:
+  reliability: reliable
+  history: keep_last
+  depth: 5
+/livox/imu:
+  reliability: reliable
+  history: keep_last
+  depth: 100

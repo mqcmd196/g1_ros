@@ -13,6 +13,28 @@ Visualization Manager:
     - Class: rviz_default_plugins/Grid
       Name: Grid
       Value: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Alpha: 1
+      Collision Enabled: false
+      Visual Enabled: true
+      Description Source: Topic
+      Description File: ""
+      Description Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
     - Class: moveit_rviz_plugin/MotionPlanning
       Name: MotionPlanning
       Planning Request:
@@ -42,6 +64,20 @@ Visualization Manager:
         Reliability Policy: Best Effort
         Value: /head_camera/d435/depth/color/points/zstd
       Value: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: D435i PointCloud (rebuilt, playback)
+      Color Transformer: RGB8
+      Size (Pixels): 3
+      Size (m): 0.01
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /head_camera/d435/depth/color/points
+      Value: false
     - Class: rviz_default_plugins/Image
       Name: D435i Color (compressed)
       Normalize Range: true
@@ -66,6 +102,20 @@ Visualization Manager:
         Reliability Policy: Best Effort
         Value: /livox/lidar
       Value: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Livox Mid-360 (zstd, playback)
+      Axis: Z
+      Color Transformer: AxisColor
+      Size (Pixels): 2
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /livox/lidar/zstd
+      Value: false
   Global Options:
     Fixed Frame: pelvis
   Tools:
