@@ -62,6 +62,8 @@ Usage:
   ros2 launch g1_bringup rosbag_record.launch.py
   ros2 launch g1_bringup rosbag_record.launch.py output:=/home/unitree/bags/pick_demo
   ros2 launch g1_bringup rosbag_record.launch.py record_points:=false
+  ros2 launch g1_bringup rosbag_record.launch.py \
+      extra_topics:="/my/topic /another/topic"
 
 Stop the recording with Ctrl-C: launch forwards SIGINT to `ros2 bag record`,
 which closes the bag cleanly.
@@ -175,6 +177,10 @@ def _launch_setup(context, *args, **kwargs):
     if LaunchConfiguration("record_points").perform(context).lower() in ("true", "1"):
         topics.append(_D435I_POINTS_ZSTD_TOPIC)
 
+    for topic in LaunchConfiguration("extra_topics").perform(context).split():
+        if topic not in topics:
+            topics.append(topic)
+
     cmd += ["--topics"] + topics
 
     livox_republisher = Node(
@@ -202,6 +208,14 @@ def generate_launch_description():
                     "Record the D435i point cloud (~11.7 MB/s, ~80% of the "
                     "bag). With false, rosbag_play.launch.py rebuilds an "
                     "approximation from the depth and color images instead"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "extra_topics",
+                default_value="",
+                description=(
+                    "Space-separated topics to record in addition to the "
+                    "built-in list"
                 ),
             ),
             DeclareLaunchArgument(
