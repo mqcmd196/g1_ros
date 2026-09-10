@@ -1,12 +1,9 @@
 # QoS overrides for `ros2 bag play` (see rosbag_play.launch.py).
 #
-# The sensor topics were recorded from publishers offering SENSOR_DATA
-# (best_effort) QoS, and rosbag2 replays a topic with the QoS it was recorded
-# with. A best_effort publisher is incompatible with the default reliable
-# subscriber, so the decompressing `republish` nodes -- which do not expose a
-# QoS parameter -- would receive nothing. Publishing these topics as reliable
-# instead is compatible with both: reliable publisher -> best_effort
-# subscriber is a valid match, so nodes using SENSOR_DATA still work.
+# The sensor topics were recorded best_effort, which default (reliable)
+# subscribers such as the `republish` nodes would refuse. Replaying them
+# reliable matches both sides: reliable publisher -> best_effort subscriber
+# is a valid pairing, so SENSOR_DATA subscribers still work too.
 /head_camera/d435/color/image_raw:
   reliability: reliable
   history: keep_last

@@ -29,34 +29,14 @@
 """
 Record a rosbag of the G1 topics.
 
-Everything worth keeping is recorded, always, with the bandwidth-heavy
-sensor streams stored as their transport-compressed variants;
+The bandwidth-heavy sensor streams are stored transport-compressed;
 rosbag_play.launch.py restores the raw streams on playback. Measured on the
-robot (D435i 640x480, MID-360):
+robot (D435i 640x480, MID-360) the bag is ~15 MB/s (~53 GB/h), of which the
+D435i point cloud is ~11.7 MB/s; record_points:=false drops it to ~5.5 MB/s.
 
-  /head_camera/d435/color/image_raw               13.9  MB/s
-                              .../compressed       1.4  MB/s
-  /head_camera/d435/depth/image_rect_raw           9.3  MB/s
-                              .../compressedDepth  1.9  MB/s
-  /head_camera/d435/depth/color/points            89.2  MB/s
-                              .../zstd            11.7  MB/s
-  /livox/lidar                                     4.5  MB/s
-                    .../zstd                       2.4  MB/s
-
-Total is roughly 15 MB/s, i.e. ~53 GB per hour, of which the D435i point
-cloud is ~11.7 MB/s; record_points:=false drops it to ~5.5 MB/s and lets
-rosbag_play.launch.py rebuild an approximate cloud instead.
-
-Note that a recorded cloud replays poorly: point_cloud_transport's zstd
-decompressor delivers only 0-3 Hz of the 6.8 Hz in the bag, in bursts. Use
-record_points:=false if the cloud is meant to be watched in RViz, and
-record_points:=true only when the exact cloud the robot published matters
-more than smooth playback.
-
-Action feedback and status are included, so a bag shows which MoveIt and
-FollowJointTrajectory goals ran and how they ended. Goals and results
-themselves are services, and would need service introspection enabled on
-the action servers, which this stack does not do.
+A recorded cloud also replays poorly (zstd decompression yields 0-3 Hz of
+the 6.8 Hz in the bag, in bursts), so keep record_points:=true only when the
+exact cloud the robot published matters more than smooth playback.
 
 Usage:
   ros2 launch g1_bringup rosbag_record.launch.py
@@ -65,8 +45,7 @@ Usage:
   ros2 launch g1_bringup rosbag_record.launch.py \
       extra_topics:="/my/topic /another/topic"
 
-Stop the recording with Ctrl-C: launch forwards SIGINT to `ros2 bag record`,
-which closes the bag cleanly.
+Stop with Ctrl-C: launch forwards SIGINT and the bag closes cleanly.
 """
 
 from launch import LaunchDescription
@@ -78,22 +57,16 @@ _D435I_BASE = "/head_camera/d435"
 _LIVOX_POINTS_TOPIC = "/livox/lidar"
 
 # Recorded only with record_points:=true (~11.7 MB/s, ~80% of the bag).
-# Recording it is the only way to reproduce what the robot publishes:
-# librealsense keeps the full, wider depth FOV and samples color per point,
-# while rebuilding on playback has to reproject depth into the color frame,
-# which drops everything outside the narrower color FOV -- measured 119k of
-# 242k points, in d435_color_optical_frame instead of
-# d435_depth_optical_frame. zstd is lossless, so replaying this topic gives
-# byte-identical clouds. With record_points:=false,
-# rosbag_play.launch.py rebuilds an approximation instead.
-#
-# g1_bringup.launch.py already republishes this to zstd when use_d435i:=true,
-# so this launch must not start a second republisher for it: two publishers
-# on one topic would put every cloud into the bag twice.
+# zstd is lossless, so this is the only way to reproduce the exact cloud the
+# robot published; the reconstruction rosbag_play.launch.py runs otherwise is
+# limited to the color FOV (measured 119k of 242k points) and stamped
+# d435_color_optical_frame. g1_bringup.launch.py already republishes this
+# topic to zstd, so no second republisher here -- two publishers on one topic
+# would put every cloud into the bag twice.
 _D435I_POINTS_ZSTD_TOPIC = f"{_D435I_BASE}/depth/color/points/zstd"
 
-# Action goal/result live on services; only feedback and status are topics.
-# They are hidden topics, hence --include-hidden-topics below.
+# Action goal/result live on services; only feedback and status are topics
+# (hidden ones, hence --include-hidden-topics below).
 _ACTION_NAMES = [
     "/move_action",
     "/execute_trajectory",
@@ -103,9 +76,6 @@ _ACTION_NAMES = [
     "/right_hand_controller/follow_joint_trajectory",
 ]
 
-# compressedDepth is PNG, hence lossless; /compressed (JPEG) would not be for
-# 16UC1 depth. realsense2_camera advertises both through image_transport, so
-# these topics already exist without any republisher of ours.
 _TOPICS = [
     # Robot state: enough to replay the kinematics and re-run TF consumers.
     "/tf",
@@ -115,23 +85,23 @@ _TOPICS = [
     "/joint_states",
     "/dynamic_joint_states",
     # Commanded trajectories, to compare against the achieved /joint_states.
-    # The hand controllers only exist with hand_type:=inspire_dfq; rosbag2
-    # warns about absent topics rather than failing.
+    # The hand controllers only exist with hand_type:=inspire_dfq (rosbag2
+    # just warns about absent topics).
     "/upper_body_controller/joint_trajectory",
     "/upper_body_controller/controller_state",
     "/left_hand_controller/joint_trajectory",
     "/left_hand_controller/controller_state",
     "/right_hand_controller/joint_trajectory",
     "/right_hand_controller/controller_state",
-    # Head camera. camera_info and extrinsics stay raw: they are tiny, and
-    # the image streams cannot be interpreted without them.
+    # Head camera. camera_info and extrinsics are tiny and stay raw.
+    # compressedDepth is lossless PNG (JPEG /compressed would not be for
+    # 16UC1 depth); realsense2_camera already advertises both variants.
     f"{_D435I_BASE}/color/camera_info",
     f"{_D435I_BASE}/depth/camera_info",
     f"{_D435I_BASE}/extrinsics/depth_to_color",
     f"{_D435I_BASE}/color/image_raw/compressed",
     f"{_D435I_BASE}/depth/image_rect_raw/compressedDepth",
-    # Livox MID-360. Nothing else in the stack produces /livox/lidar/zstd,
-    # so this launch runs that republisher below.
+    # Livox MID-360; /livox/lidar/zstd comes from the republisher below.
     "/livox/imu",
     f"{_LIVOX_POINTS_TOPIC}/zstd",
     # gear_sonic (SONIC) command side; resulting motion is in /joint_states.
@@ -162,8 +132,7 @@ def _launch_setup(context, *args, **kwargs):
         "record",
         "--storage",
         "mcap",
-        # zstd-compresses the mcap chunks while keeping the bag seekable,
-        # unlike rosbag2's --compression-mode file.
+        # zstd per chunk; keeps the bag seekable, unlike --compression-mode.
         "--storage-preset-profile",
         "zstd_fast",
         "--include-hidden-topics",

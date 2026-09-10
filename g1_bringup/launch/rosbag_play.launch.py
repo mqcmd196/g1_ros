@@ -29,18 +29,11 @@
 """
 Play back a rosbag recorded by rosbag_record.launch.py.
 
-The bag stores the bandwidth-heavy sensor streams in their transport-
-compressed form and they are replayed as-is; nothing is decompressed here.
-Consumers subscribe through image_transport / point_cloud_transport, which
-pick the transport from the topic name, so they get the raw message without
-an extra republisher in between. RViz needs no help: rviz_default_plugins
-depends on both libraries, and its Image and PointCloud2 displays subscribe
-to .../compressed and .../zstd natively (verified against a running RViz).
-
-Bags recorded with record_points:=false hold no D435i cloud; for those the
-cloud is rebuilt here from the depth and color images. That is the one case
-where something is decompressed, because depth_image_proc subscribes to the
-raw images rather than through image_transport.
+The compressed sensor streams replay as-is; consumers (RViz included)
+subscribe through image_transport / point_cloud_transport and need no
+republisher. The exception: bags recorded with record_points:=false hold no
+D435i cloud, so it is rebuilt here from the depth and color images, which
+depth_image_proc only accepts raw.
 
 Do not run this against the live robot: the bag republishes /joint_states,
 /tf and /robot_description, which would fight the real robot_state_publisher.
@@ -55,7 +48,7 @@ Usage:
   # Drive nodes off the bag clock (they need use_sim_time:=true themselves)
   ros2 launch g1_bringup rosbag_play.launch.py bag:=./pick_demo clock:=true
 
-Playback is interactive: SPACE pauses/resumes, and Ctrl-C stops.
+SPACE pauses/resumes; Ctrl-C stops.
 """
 
 from pathlib import Path
@@ -77,16 +70,14 @@ _D435I_BASE = "/head_camera/d435"
 _D435I_COLOR_TOPIC = f"{_D435I_BASE}/color/image_raw"
 _D435I_DEPTH_TOPIC = f"{_D435I_BASE}/depth/image_rect_raw"
 _D435I_POINTS_TOPIC = f"{_D435I_BASE}/depth/color/points"
-_LIVOX_POINTS_TOPIC = "/livox/lidar"
 
 
 def _bag_topics(bag):
     """
     Return the set of topic names stored in the bag.
 
-    Returns None when the bag's metadata cannot be read (e.g. a bare .mcap
-    file was passed instead of a bag directory), so callers can fall back to
-    assuming every stream might be present.
+    None when the metadata cannot be read (e.g. a bare .mcap file was passed);
+    callers then assume every stream might be present.
     """
     metadata = Path(bag) / "metadata.yaml"
     if not metadata.is_file():
@@ -103,10 +94,9 @@ def _image_decompressor(name, raw_topic, transport):
     """
     Decode an image_transport-compressed topic back to sensor_msgs/Image.
 
-    Only used to feed the reconstruction below: depth_image_proc subscribes to
-    the raw images, and a bag holds only the compressed ones. Unlike the
-    ~6 MB point cloud, these decode at the full bag rate (measured 183 of 183
-    frames on both streams).
+    Only feeds the reconstruction below: depth_image_proc needs the raw
+    images and a bag holds only the compressed ones. These decode at the
+    full bag rate (measured 183 of 183 frames on both streams).
     """
     return Node(
         package="image_transport",
@@ -124,16 +114,13 @@ def _points_reconstruction():
     """
     Rebuild an approximate D435i colored cloud from the depth and color images.
 
-    Used for bags recorded with record_points:=false. This is not what the
-    robot published: librealsense keeps the full, wider depth FOV and samples
-    color per point, whereas registering depth into the color frame drops
-    everything outside the narrower color FOV -- measured 119k of 242k points
-    -- and yields frame_id d435_color_optical_frame rather than
-    d435_depth_optical_frame. The two frames differ by the recorded static
-    transform (15 mm in x), so the geometry is consistent once TF is applied.
+    For bags recorded with record_points:=false. Unlike the cloud the robot
+    published it is limited to the color FOV (measured 119k of 242k points)
+    and stamped d435_color_optical_frame instead of d435_depth_optical_frame;
+    the recorded static TF between the two keeps the geometry consistent.
 
-    Both nodes share one container with intra-process comms, which keeps the
-    intermediate registered depth image from being serialized.
+    One shared container with intra-process comms keeps the intermediate
+    registered depth image from being serialized.
     """
     color_info = f"{_D435I_BASE}/color/camera_info"
     registered = f"{_D435I_BASE}/depth_registered/image_rect"
@@ -216,8 +203,7 @@ def _launch_setup(context, *args, **kwargs):
 
     actions = []
 
-    # Bags recorded with record_points:=false hold no cloud; rebuild an
-    # approximation from the images. See _points_reconstruction().
+    # No recorded cloud in the bag -> rebuild it, see _points_reconstruction().
     bag_topics = _bag_topics(bag)
     if bag_topics is not None:
         have_images = {
